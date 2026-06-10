@@ -317,3 +317,14 @@ The engine includes multiple on-screen debug panels that can be enabled/visible 
    - Streaming behavior and state
 
 Use this panel to inspect and validate how content is being streamed during gameplay, and to help diagnose issues related to odd gameplay behavior or missing stream areas.
+
+<br/>
+
+Inside of the Streaming debug view, you can see colored highlighted spaces within the panel UI:
+
+- Regular streaming
+  - Green: A streamed in space
+  - Yellow: A not yet fully streamed in space
+- Prefetch related, e.g. ``RequestStreamAroundAsync``
+  - Orange: A streamed in space through prefetch
+  - Purple: A not yet fully streamed in space through prefetch
