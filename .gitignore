@@ -6,3 +6,7 @@
 # Files
 .DS_Store
 **.env
+
+# Generated preview build
+site/preview/
+__pycache__/
