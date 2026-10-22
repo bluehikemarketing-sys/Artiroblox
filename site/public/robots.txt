@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.seagrapecleaning.com/sitemap.xml
+Sitemap: https://www.sunnymop.com/sitemap.xml

@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 72" width="360" height="72">
-<g transform="translate(4 4)">
-<path d="M30 52C14 48 5 36 7 23 9 11 21 4 32 6c14 2 24 12 22 26-2 12-12 20-24 20z" fill="#2e6b57"/>
-<path d="M30 52V15M30 41l-11-8M30 41l12-8M30 30l-13-8M30 30l14-8M30 21l-8-5M30 21l9-5" stroke="#f5f8f6" stroke-width="2.2" stroke-linecap="round" fill="none"/>
-<circle cx="47" cy="51" r="5" fill="#6a3d6e"/><circle cx="56" cy="47" r="5" fill="#6a3d6e"/><circle cx="53" cy="57" r="5" fill="#6a3d6e"/>
-</g>
-<text x="80" y="38" font-family="'Bricolage Grotesque', 'Avenir Next', sans-serif" font-weight="700" font-size="32" fill="#13241f">Sea Grape</text>
-<text x="81" y="60" font-family="'IBM Plex Mono', monospace" font-size="12.5" letter-spacing="2.4" fill="#4f625c">HOME CLEANING</text>
-</svg>
