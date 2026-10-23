@@ -38,6 +38,10 @@ B = {
     "ga4_id": "",           # Google Analytics 4 id, e.g. "G-XXXXXXX"
     "year": 2026,
     "same_as": [],          # Google Business Profile, LinkedIn, Instagram once they exist
+    # The owner, shown on the About page. Prospects from cold email look for a real person. Leave empty to hide.
+    "owner_name": "",       # e.g. "Mike Rivera"
+    "owner_photo": "",      # a file in site/static/img, e.g. "owner.webp" (a real photo of you, 800x1000)
+    "owner_bio": "",        # 2-3 sentences in your own words: where you're from, why you started, what you check every night
 }
 
 PROOF = {
@@ -170,7 +174,7 @@ FAQ = [
     ("How much does office cleaning cost?", f"We charge by cleaning time: about ${PRICING['hourly']} per hour, with a ${PRICING['min_visit']} minimum per visit. A 2,000 square foot medical office cleaned three nights a week is about ${monthly_price('medical', 2000, 2, 3):,} a month. The estimator shows your number."),
     ("When do you clean?", "After you close, usually between 6 PM and 2 AM. You pick the nights, and we're done before you open."),
     ("Who does the cleaning?", "Clean by Morning is owner-operated. The owner cleans or inspects every account, so you have one person responsible."),
-    ("Do you clean medical and dental offices?", "Yes, they're most of what we do. We use color-coded microfiber and EPA-registered disinfectants, and we never handle sharps or regulated medical waste."),
+    ("Do you clean medical and dental offices?", "Yes, they're our focus. We use color-coded microfiber and EPA-registered disinfectants, and we never handle sharps or regulated medical waste."),
     ("How do I pay?", "Monthly, by ACH autopay on the 1st. The first month is paid before the first clean. One-time jobs take a 50% deposit."),
     ("Is there a long contract?", "No. It's month to month. Either side can end it with 30 days' notice."),
     ("Do you bring supplies?", "Yes. Restroom paper, soap and liners can be restocked at cost, or you can supply your own."),
@@ -231,7 +235,7 @@ class Ctx:
 
     def img(self, key, lazy=True):
         p = PHOTOS[key]
-        loading = ' loading="lazy"' if lazy else ""
+        loading = ' loading="lazy"' if lazy else ' fetchpriority="high"'
         return (f'<img src="{self.asset("img/" + p["file"])}" alt="{E(p["alt"])}" '
                 f'width="{p["w"]}" height="{p["h"]}"{loading} decoding="async">')
 
@@ -246,7 +250,10 @@ def business_schema():
          "description": "Evening commercial cleaning for medical offices, dental practices, offices and gyms in Brooklyn, Manhattan and Nassau County.",
          "areaServed": [{"@type": "City", "name": "Brooklyn, NY"}, {"@type": "City", "name": "Manhattan, NY"}, {"@type": "AdministrativeArea", "name": "Nassau County, NY"}],
          "priceRange": "$$", "openingHours": B["hours_schema"], "image": B["domain"] + "/img/" + PHOTOS["bridge"]["file"], "sameAs": B["same_as"],
+         "logo": B["domain"] + "/icon-512.png",
          "makesOffer": [{"@type": "Offer", "itemOffered": {"@type": "Service", "name": s["name"]}} for s in SERVICES]}
+    if B["owner_name"]:
+        s["founder"] = {"@type": "Person", "name": B["owner_name"], "jobTitle": "Owner"}
     if PROOF["review_count"] and PROOF["rating"]:
         s["aggregateRating"] = {"@type": "AggregateRating", "ratingValue": PROOF["rating"], "reviewCount": PROOF["review_count"]}
     return s
@@ -344,9 +351,10 @@ def page(ctx, key, title, desc, body, active=None, schema=(), noindex=False, wra
 <link rel="canonical" href="{canon}">
 <meta property="og:type" content="website"><meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
 <meta property="og:url" content="{canon}"><meta property="og:site_name" content="Clean by Morning">
-<meta property="og:image" content="{B["domain"]}/img/{PHOTOS["bridge"]["file"]}"><meta name="twitter:card" content="summary_large_image">
+<meta property="og:image" content="{B["domain"]}/img/og-cover.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Clean by Morning: you lock up, we clean"><meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0034eb">
-<link rel="icon" href="{ctx.asset("favicon.svg")}" type="image/svg+xml">
+<link rel="icon" href="{ctx.asset("favicon.svg")}" type="image/svg+xml"><link rel="apple-touch-icon" href="{ctx.asset("apple-touch-icon.png")}">
 <link rel="preload" href="{ctx.asset("fonts/sentient-300.woff2")}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{ctx.asset("styles.css")}">
 {ga}{"".join(jsonld(s) for s in schema)}'''
@@ -582,15 +590,29 @@ def faq_page(ctx):
                 body, schema=[faq_schema(FAQ), crumbs_schema(ctx, trail)])
 
 
+def owner_section(ctx):
+    if not B["owner_name"]:
+        return ""
+    photo = ""
+    if B["owner_photo"]:
+        photo = (f'<div class="head-photo"><img src="{ctx.asset("img/" + B["owner_photo"])}" alt="{E(B["owner_name"])}, owner of Clean by Morning" '
+                 f'width="800" height="1000" loading="lazy" decoding="async"></div>')
+    bio = f'<p>{E(B["owner_bio"])}</p>' if B["owner_bio"] else ""
+    return f'''<section class="section" id="owner"><div class="wrap page-head reveal"><div class="stack">
+<h2>{E(B["owner_name"])}, owner</h2>{bio}
+<p>Call or text me directly at <a class="num" href="tel:{B["phone_e164"]}">{E(B["phone_display"])}</a>.</p></div>{photo}</div></section>'''
+
+
 def about_page(ctx):
     trail = [("index", "Home"), ("about", "About")]
     body = f'''{crumbs(ctx, "About")}
 {page_head(ctx, "One crew, one checklist", "Clean by Morning is an owner-operated cleaning company for medical practices and small offices in New York City and Nassau County.", "windows")}
 {photo_row(ctx, ["bridge", "rain", "morning"], "From lock-up to opening: the hours we work.")}
 <section class="section"><div class="wrap grid reveal"><div class="left6"><h2>Why we work this way</h2></div><div class="right5 stack">
-<p>Office managers tell us the same story: a different cleaner every month, a checklist nobody follows, and an invoice that keeps changing. We built Clean by Morning to fix that.</p>
+<p>The usual complaints about commercial cleaners are a different person every month, a checklist nobody follows, and an invoice that keeps changing. Clean by Morning is set up to avoid all three.</p>
 <p>The owner cleans or inspects every account. Every visit follows the same written checklist. Prices are fixed and billed once a month, and you can leave with 30 days' notice.</p>
 <p>We clean in the evening, after you close, so your patients and staff never see us, only the result.</p></div></div></section>
+{owner_section(ctx)}
 {contact_field(ctx)}'''
     return page(ctx, "about", "About Clean by Morning | NYC Office Cleaning",
                 "Clean by Morning is an owner-operated evening cleaning company for medical practices and small offices in NYC and Nassau County.",
@@ -720,7 +742,25 @@ def copy_static(dest):
         shutil.copy(ROOT / "static" / f, dest / f)
     shutil.copytree(ROOT / "static" / "img", dest / "img", dirs_exist_ok=True)
     shutil.copytree(ROOT / "static" / "fonts", dest / "fonts", dirs_exist_ok=True)
+    for f in ("apple-touch-icon.png", "icon-512.png"):
+        shutil.copy(ROOT / "static" / f, dest / f)
     write(dest / "favicon.svg", FAVICON)
+    # Cloudflare Pages: long caching for fonts and images, basic security headers everywhere
+    write(dest / "_headers", "/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n"
+          "/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n/img/*\n  Cache-Control: public, max-age=2592000\n")
+
+
+def launch_warnings():
+    out = []
+    if "555-01" in B["phone_display"]:
+        out.append("phone is still the 555 placeholder: prospects who look you up will call it")
+    if not B["form_endpoint"]:
+        out.append("form_endpoint is empty: the walkthrough form opens an email app instead of sending")
+    if not B["same_as"]:
+        out.append("same_as is empty: add your Google Business Profile and LinkedIn URLs")
+    if not B["owner_name"]:
+        out.append("owner_name is empty: the About page shows no person")
+    return out
 
 
 def build():
@@ -745,6 +785,8 @@ def build():
     write(prev / "index.html", entry)
     copy_static(prev)
     print(f"Built {len(pages)} live pages, {len(pp) + 1} preview pages.")
+    for w in launch_warnings():
+        print("BEFORE LAUNCH:", w)
 
 
 if __name__ == "__main__":
