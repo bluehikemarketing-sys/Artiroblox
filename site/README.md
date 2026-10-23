@@ -12,6 +12,19 @@ The website for Clean by Morning, evening commercial cleaning in Brooklyn, Manha
 
 Output: `site/public/` is the live site to deploy. `site/preview/` is a flat local preview and is not committed.
 
+## Deploy (DreamHost)
+
+The build writes a `.htaccess` into `site/public` that forces `https://www.`, serves the 404 page, and sets caching. Upload the *contents* of `site/public` (not the folder itself) to the domain's web directory, `~/cleanbymorning.com/`.
+
+1. DreamHost panel → Websites → Manage Websites: confirm `cleanbymorning.com` is hosted (Fully Hosted), with the www setting on "Add www" or "Leave it alone".
+2. Same page → **HTTPS / SSL certificate**: add the free Let's Encrypt certificate and wait until it shows as active (minutes to an hour). Do this before uploading, because `.htaccess` redirects every visit to https.
+3. Upload with either:
+   - **Panel**: Websites → Manage Files (the file manager) → open `cleanbymorning.com` → delete DreamHost's placeholder `index.html` → upload `cleanbymorning-site.zip` → extract it there, so `index.html` sits directly in `cleanbymorning.com/`.
+   - **SFTP** (FileZilla): host `sftp.dreamhost.com` or your server name, port 22, your website user from Websites → SFTP Users; drag the contents of `site/public` into `cleanbymorning.com/`. Show hidden files so `.htaccess` goes up too.
+4. Open `cleanbymorning.com`: it should land on `https://www.cleanbymorning.com/` with the padlock.
+
+To update later: run `python3 site/build.py`, then upload the changed files (or the whole folder) again.
+
 ## Deploy (Cloudflare Pages, free)
 
 1. Cloudflare → Workers & Pages → Create → Pages → Connect to Git → this repo.

@@ -27,8 +27,8 @@ B = {
     "name": "Clean by Morning",
     "legal_name": "Clean by Morning Office Cleaning",
     "domain": "https://www.cleanbymorning.com",
-    "phone_display": "(917) 555-0142",      # PLACEHOLDER: your business line
-    "phone_e164": "+19175550142",           # PLACEHOLDER
+    "phone_display": "(516) 518-1731",      # the Quo business line
+    "phone_e164": "+15165181731",
     "email": "hello@cleanbymorning.com",    # set up this mailbox on the domain
     "city_line": "New York, NY",
     "office_hours": "Quotes Mon–Sat, 9 AM–7 PM",
@@ -746,8 +746,40 @@ def copy_static(dest):
         shutil.copy(ROOT / "static" / f, dest / f)
     write(dest / "favicon.svg", FAVICON)
     # Cloudflare Pages: long caching for fonts and images, basic security headers everywhere
+    write(dest / ".htaccess", HTACCESS)
     write(dest / "_headers", "/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n"
           "/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n/img/*\n  Cache-Control: public, max-age=2592000\n")
+
+
+# DreamHost (Apache): force https and www, the 404 page, no folder listings, caching
+HTACCESS = """Options -Indexes
+ErrorDocument 404 /404.html
+DirectoryIndex index.html
+
+RewriteEngine On
+RewriteCond %{HTTPS} off [OR]
+RewriteCond %{HTTP_HOST} !^www\\. [NC]
+RewriteCond %{HTTP_HOST} ^(?:www\\.)?(.+)$ [NC]
+RewriteRule ^ https://www.%1%{REQUEST_URI} [L,R=301]
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  <FilesMatch "\\.(woff2)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "\\.(webp|jpg|png|svg)$">
+    Header set Cache-Control "public, max-age=2592000"
+  </FilesMatch>
+  <FilesMatch "\\.(css|js)$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript image/svg+xml application/xml text/plain
+</IfModule>
+"""
 
 
 def launch_warnings():
