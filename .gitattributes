@@ -19,3 +19,6 @@ content/zh-tw/assets/** filter=lfs diff=lfs merge=lfs -text
 *.webp binary
 *.jpg binary
 *.png binary
+*.woff2 binary
+*.woff binary
+*.ttf binary
