@@ -1,121 +1,114 @@
-// SunnyMop: instant price, next openings, request by text or email, the Naples photo frame and the first-clean offer.
+// Clean by Morning: the price estimator, the walkthrough form, the lit neighborhood names and the section entrances.
 (() => {
-  const C = window.SUNNYMOP;
+  const C = window.CBM;
   if (!C) return;
   const P = C.pricing;
   const r5 = x => Math.floor(x / 5 + 0.5) * 5;
-  const NAMES = { standard: 'Standard clean', deep: 'Deep clean', moveout: 'Move-in / move-out clean', airbnb: 'Airbnb turnover' };
-  const FREQ = { once: 'one time', weekly: 'weekly', biweekly: 'every 2 weeks', monthly: 'monthly' };
+  const money = n => '$' + n.toLocaleString('en-US');
+  const visit = (kind, sqft, rest) => Math.max(P.min_visit, r5((sqft / P.sqft_per_hour[kind] + rest * P.restroom_hours) * P.hourly));
+  const NAMES = { medical: 'Medical office', dental: 'Dental office', office: 'Office', gym: 'Gym or studio', postcon: 'Post-construction' };
 
-  function price(kind, bed, bath, freq) {
-    let v = (P.base + P.per_bed * bed + P.per_bath * bath) * P.mult[kind];
-    if (kind === 'standard') v *= 1 - P.freq[freq];
-    return Math.max(P.minimum, r5(v));
-  }
-
-  const now = new Date();
-  const slots = (C.slots && C.slots.length ? C.slots : C.sampleSlots || [])
-    .map(s => ({ s, d: new Date(s) })).filter(x => !isNaN(x.d) && x.d > now).slice(0, 4);
-  const sample = !(C.slots && C.slots.length) && slots.length > 0;
-  const fmt = d => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ', ' +
-    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-  function send(subject, body) {
-    if (C.bookingUrl) { window.location.href = C.bookingUrl; return; }
-    const sms = 'sms:' + C.phone + '?&body=' + encodeURIComponent(body);
-    const mail = 'mailto:' + C.email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    const mobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
-    window.location.href = mobile ? sms : mail;
-  }
-
-  document.querySelectorAll('[data-quote]').forEach((form, n) => {
-    const total = form.querySelector('[data-total]');
-    const per = form.querySelector('[data-per]');
-    const freqField = form.querySelector('[data-freq-field]');
-    const zip = form.querySelector('[name="zip"]');
-    const zipMsg = form.querySelector('[data-zip-msg]');
-    const slotBox = form.querySelector('[data-slots]');
-    const slotEmpty = form.querySelector('[data-slots-empty]');
-    const note = form.querySelector('[data-quote-note]');
-
-    // Give each form's controls unique ids when a page has more than one.
-    if (n > 0) form.querySelectorAll('[id]').forEach(el => {
-      const old = el.id; el.id = old + '-' + n;
-      const lab = form.querySelector(`label[for="${old}"]`); if (lab) lab.htmlFor = el.id;
-    });
-
-    if (slots.length) {
-      slotEmpty.hidden = true;
-      slotBox.innerHTML = slots.map((x, i) => `<label class="chip"><input type="radio" name="slot" value="${x.s}"${i === 0 ? ' checked' : ''}><span>${fmt(x.d)}</span></label>`).join('');
-      if (sample) slotBox.insertAdjacentHTML('afterend', '<p class="slots-empty">Sample openings shown in this preview.</p>');
-    }
-
-    function state() {
-      const kind = form.service.value;
-      const bed = +form.beds.value, bath = +form.baths.value;
-      const freq = (form.querySelector('[name="freq"]:checked') || {}).value || 'once';
-      const adds = [...form.querySelectorAll('[name="addon"]:checked')].map(i => P.addons.find(a => a[0] === i.value));
-      return { kind, bed, bath, freq: kind === 'standard' ? freq : 'once', adds };
-    }
+  // Estimator
+  document.querySelectorAll('[data-estimator]').forEach(form => {
+    const fig = form.querySelector('[data-est-figure]');
+    const label = form.querySelector('[data-est-label]');
+    const detail = form.querySelector('[data-est-detail]');
+    const sqftOut = form.querySelector('[data-sqft-out]');
+    const cta = form.querySelector('[data-est-cta]');
+    const recurring = form.querySelectorAll('[data-recurring]');
     function update() {
-      const s = state();
-      freqField.hidden = s.kind !== 'standard';
-      const t = price(s.kind, s.bed, s.bath, s.freq) + s.adds.reduce((a, x) => a + x[2], 0);
-      total.textContent = '$' + t;
-      per.textContent = s.kind === 'airbnb' ? 'per turnover' : (s.freq !== 'once' ? 'per visit' : 'per clean');
-      return t;
-    }
-    function checkZip() {
-      const z = zip.value.trim();
-      if (!z) { zipMsg.textContent = ''; return true; }
-      if (!/^\d{5}$/.test(z)) { zipMsg.textContent = 'Enter a 5-digit zip code.'; return false; }
-      if (!C.zips.includes(z)) { zipMsg.textContent = `We don't clean in ${z} yet. Text us and we'll tell you if we can make it work.`; return false; }
-      zipMsg.textContent = ''; return true;
+      const kind = form.querySelector('[name="kind"]:checked').value;
+      const sqft = +form.sqft.value;
+      sqftOut.textContent = sqft.toLocaleString('en-US');
+      const one = kind === 'postcon';
+      recurring.forEach(el => { el.hidden = one; });
+      let summary;
+      if (one) {
+        const total = Math.max(P.postcon_min, r5(sqft * P.postcon_per_sqft));
+        label.textContent = 'One-time price';
+        fig.textContent = money(total);
+        detail.textContent = `${sqft.toLocaleString('en-US')} sq ft, ${Math.round(P.deposit * 100)}% deposit to book.`;
+        summary = `${NAMES[kind]}, ${sqft} sq ft, estimate ${money(total)}`;
+      } else {
+        const nights = +form.querySelector('[name="nights"]:checked').value;
+        const rest = +form.restrooms.value;
+        const v = visit(kind, sqft, rest);
+        const month = r5(v * nights * P.weeks_per_month);
+        label.textContent = 'Estimated monthly price';
+        fig.textContent = money(month);
+        detail.textContent = `About ${money(v)} a visit, ${nights} night${nights > 1 ? 's' : ''} a week.`;
+        summary = `${NAMES[kind]}, ${sqft} sq ft, ${rest} restrooms, ${nights} nights a week, estimate ${money(month)}/month`;
+      }
+      cta.href = C.walkthrough + '?estimate=' + encodeURIComponent(summary);
     }
     form.addEventListener('input', update);
     form.addEventListener('change', update);
-    zip.addEventListener('blur', checkZip);
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      checkZip();
-      const s = state(); const t = update();
-      const slot = form.querySelector('[name="slot"]:checked');
-      const lines = [
-        `Hi SunnyMop, I'd like to book: ${NAMES[s.kind]}${s.kind === 'standard' ? ' (' + FREQ[s.freq] + ')' : ''}`,
-        `${s.bed} bed, ${s.bath} bath${zip.value ? ', zip ' + zip.value.trim() : ''}`,
-        s.adds.length ? 'Add-ons: ' + s.adds.map(a => a[1]).join(', ') : '',
-        `Price shown: $${t}`,
-        slot ? 'Opening: ' + fmt(new Date(slot.value)) : 'Next opening, please.'
-      ].filter(Boolean);
-      send('Cleaning request', lines.join('\n'));
-      note.textContent = `Your text or email app should open with this request. If it doesn't, text ${C.phoneDisplay}.`;
-    });
+    form.addEventListener('submit', e => e.preventDefault());
     update();
   });
 
-  // The Naples frame: tap to show the next photo
-  document.querySelectorAll('[data-frame]').forEach(btn => {
-    const imgs = [...btn.querySelectorAll('img')];
-    const cap = btn.parentNode.querySelector('[data-frame-caption]');
-    let i = 0;
-    btn.addEventListener('click', () => {
-      imgs[i].classList.remove('on');
-      i = (i + 1) % imgs.length;
-      imgs[i].classList.add('on');
-      if (cap) cap.textContent = imgs[i].dataset.caption || '';
+  // Walkthrough form: post to a form service when configured, otherwise open a pre-filled email
+  document.querySelectorAll('[data-walkthrough]').forEach(form => {
+    const msg = form.querySelector('[data-form-msg]');
+    try {
+      const est = new URLSearchParams(location.search).get('estimate');
+      if (est && !form.notes.value) form.notes.value = 'From the estimator: ' + est;
+    } catch (e) {}
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!form.name.value.trim() || !/.+@.+\..+/.test(form.email.value)) { msg.textContent = 'Add your name and a valid email.'; return; }
+      const data = Object.fromEntries(new FormData(form).entries());
+      if (C.formEndpoint) {
+        msg.textContent = 'Sending…';
+        try {
+          const r = await fetch(C.formEndpoint, { method: 'POST', headers: { Accept: 'application/json' }, body: new FormData(form) });
+          if (!r.ok) throw new Error(r.status);
+          form.reset();
+          msg.textContent = "Thanks. We'll reply within one business day with times for the walkthrough.";
+          return;
+        } catch (err) { msg.textContent = `That didn't send. Email ${C.email} or call ${C.phoneDisplay}.`; return; }
+      }
+      const body = Object.entries(data).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join('\n');
+      location.href = `mailto:${C.email}?subject=${encodeURIComponent('Walkthrough request: ' + (data.company || data.name))}&body=${encodeURIComponent(body)}`;
+      msg.textContent = `Your email app should open with this request. If it doesn't, email ${C.email}.`;
     });
   });
 
-  // First-clean offer
-  document.querySelectorAll('[data-offer]').forEach(form => {
-    const msg = form.querySelector('[data-offer-msg]');
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      if (!form.name.value.trim() || !form.phone.value.trim()) { msg.textContent = 'Add your name and mobile number.'; return; }
-      const body = `Hi SunnyMop, I'd like my first-clean offer.\nName: ${form.name.value.trim()}\nMobile: ${form.phone.value.trim()}` +
-        (form.zip.value ? `\nZip: ${form.zip.value.trim()}` : '') + `\nService: ${form.service.value}`;
-      send('First-clean offer', body);
-      msg.textContent = `Your text or email app should open with this message. If it doesn't, text ${C.phoneDisplay}.`;
-    });
+  // Phone action bar: shows when you scroll back up, stays out of the way while you read down
+  const bar = document.querySelector('.action-bar');
+  if (bar) {
+    let lastY = window.scrollY;
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY;
+      const nearEnd = y + innerHeight > document.documentElement.scrollHeight - 200;
+      bar.classList.toggle('show', y < lastY - 4 && y > 300 && !nearEnd);
+      lastY = y;
+    }, { passive: true });
+  }
+
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Hero shutter
+  requestAnimationFrame(() => document.querySelectorAll('.shutter').forEach(el => el.classList.add('open')));
+
+  // Section entrances and panel pictures
+  const targets = document.querySelectorAll('.reveal, .panel');
+  if ('IntersectionObserver' in window && !still) {
+    const io = new IntersectionObserver(entries => entries.forEach(en => {
+      if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+    }), { rootMargin: '0px 0px -10% 0px' });
+    targets.forEach(t => io.observe(t));
+  } else {
+    targets.forEach(t => t.classList.add('in'));
+  }
+
+  // The lit neighborhood name moves through the list
+  document.querySelectorAll('[data-names]').forEach(p => {
+    const names = [...p.querySelectorAll('a')];
+    if (!names.length) return;
+    let i = 0;
+    names[0].classList.add('lit');
+    if (still) return;
+    setInterval(() => { names[i].classList.remove('lit'); i = (i + 1) % names.length; names[i].classList.add('lit'); }, 2000);
   });
 })();

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""Build the SunnyMop website, brand kit and launch checklist.
+"""Build the Clean by Morning website.
 
 Usage:  python3 site/build.py
 
 Writes:
   site/public/   the live website (deploy this folder to Cloudflare Pages)
   site/preview/  a flat preview copy with relative links (not committed)
-  brand/ and docs/
 
-Everything marked PLACEHOLDER must be replaced before launch. Proof (insurance, reviews, before-and-after
-photos) only appears once the matching setting below is filled in with something real.
+Everything marked PLACEHOLDER must be replaced before launch. Proof (insurance, reviews, client names)
+only appears once the matching setting below is filled in with something real.
 """
 import html
 import json
@@ -19,60 +18,46 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
+E = html.escape
 
 # ---------------------------------------------------------------------------
 # Business settings
 # ---------------------------------------------------------------------------
 B = {
-    "name": "SunnyMop",
-    "domain": "https://www.sunnymop.com",          # PLACEHOLDER: buy the domain, then set it here
-    "phone_display": "(239) 555-0100",              # PLACEHOLDER: your Quo number
-    "phone_e164": "+12395550100",                   # PLACEHOLDER
-    "email": "hello@sunnymop.com",                  # PLACEHOLDER
-    "hours": "Mon–Sat, 8 AM–6 PM",
-    "hours_schema": ["Mo-Sa 08:00-18:00"],
-    "city": "Naples", "state": "FL",
-    "booking_url": "",          # your booking app's page once you have one (ZenMaid, Jobber, ...); empty = text/email request
-    "ga4_id": "",               # Google Analytics 4 measurement id, e.g. "G-XXXXXXX"; empty = no analytics
-    "first_clean_off": 25,      # PLACEHOLDER amount: dollars off the first clean
+    "name": "Clean by Morning",
+    "legal_name": "Clean by Morning Office Cleaning",
+    "domain": "https://www.cleanbymorning.com",
+    "phone_display": "(917) 555-0142",      # PLACEHOLDER: your business line
+    "phone_e164": "+19175550142",           # PLACEHOLDER
+    "email": "hello@cleanbymorning.com",    # set up this mailbox on the domain
+    "city_line": "New York, NY",
+    "office_hours": "Quotes Mon–Sat, 9 AM–7 PM",
+    "cleaning_hours": "We clean after you close, 6 PM–2 AM",
+    "hours_schema": ["Mo-Sa 09:00-19:00"],
+    "form_endpoint": "",    # e.g. a Formspree or Basin URL; empty = the form opens a pre-filled email instead
+    "ga4_id": "",           # Google Analytics 4 id, e.g. "G-XXXXXXX"
     "year": 2026,
-    "same_as": [],              # Google Business Profile, Facebook, Instagram... once they exist
+    "same_as": [],          # Google Business Profile, LinkedIn, Instagram once they exist
 }
 
-# Proof. Fill in only what is true today; empty or False keeps it off the site.
 PROOF = {
-    "insured": False,               # True once general liability insurance is bound
-    "bonded": False,                # True once a janitorial bond is in place
-    "background_checked": False,    # True once every cleaner has passed a background check
-    "review_count": 0,              # your real Google review count
-    "rating": None,                 # your real Google rating, e.g. 4.9
-    "google_reviews_url": "",       # link to your Google reviews
+    "insured": False,            # True once general liability is bound (and you can send a certificate)
+    "bonded": False,             # True once a janitorial bond is in place
+    "workers_comp": False,       # True once you carry workers' comp (required from your first employee in NY)
+    "review_count": 0, "rating": None, "google_reviews_url": "",
+    "clients": [],               # client names you have written permission to list, e.g. "Park Slope Family Dental"
 }
-
-# Real SunnyMop job photos, same angle before and after. Put files in site/static/img/ and list them here:
-# {"before": "deep-cleaning-oven-before-naples.webp", "after": "deep-cleaning-oven-after-naples.webp",
-#  "alt": "Oven before and after deep cleaning in Naples, FL", "service": "deep-cleaning"}
-BEFORE_AFTER = []
-
-# Openings you can really take. ISO date-times in Naples local time, e.g. "2026-10-27T09:00".
-# Past ones are hidden automatically. Empty = the page asks people to text for the next opening.
-OPEN_SLOTS = []
-# Shown in the preview build only, labelled as samples.
-SAMPLE_SLOTS = ["2026-10-27T09:00", "2026-10-27T13:00", "2026-10-28T09:00", "2026-10-29T13:00"]
-
-ZIPS = ["34102", "34103", "34104", "34105", "34108", "34109", "34110", "34112", "34113", "34114", "34116", "34117", "34119", "34120"]
 
 # ---------------------------------------------------------------------------
-# Pricing: one formula for the quote, the tiles, the tables and the schema
+# Pricing: one model for the estimator, the price sentence, the pricing table and the schema
 # ---------------------------------------------------------------------------
 PRICING = {
-    # Matched to the Naples average (HomeAdvisor: $148 a clean, typical $119–$203): a 2-bed, 2-bath clean is $150.
-    "base": 70, "per_bed": 25, "per_bath": 15,      # one-time standard clean
-    "mult": {"standard": 1.0, "deep": 1.5, "moveout": 1.6, "airbnb": 0.6},
-    "freq": {"once": 0.0, "weekly": 0.20, "biweekly": 0.15, "monthly": 0.10},  # recurring discounts, standard only
-    "minimum": 110,
-    "addons": [["oven", "Inside the oven", 35], ["fridge", "Inside the fridge", 35], ["cabinets", "Inside cabinets", 45],
-               ["baseboards", "Baseboards (included in deep)", 35], ["windows", "Interior windows", 45], ["laundry", "Laundry, wash and fold", 25]],
+    "hourly": 50,                  # charged per cleaning hour
+    "min_visit": 75,               # minimum per visit
+    "sqft_per_hour": {"medical": 1800, "dental": 1800, "office": 2500, "gym": 2000},
+    "restroom_hours": 0.15,        # added per restroom per visit
+    "weeks_per_month": 4.33,
+    "postcon_per_sqft": 0.30, "postcon_min": 400, "deposit": 0.5,
 }
 
 
@@ -80,137 +65,143 @@ def r5(x):
     return int(math.floor(x / 5 + 0.5) * 5)
 
 
-def price(kind, bed, bath, freq="once"):
-    p = PRICING
-    v = (p["base"] + p["per_bed"] * bed + p["per_bath"] * bath) * p["mult"][kind]
-    if kind == "standard":
-        v *= 1 - p["freq"][freq]
-    return max(p["minimum"], r5(v))
+def visit_price(kind, sqft, restrooms):
+    hrs = sqft / PRICING["sqft_per_hour"][kind] + restrooms * PRICING["restroom_hours"]
+    return max(PRICING["min_visit"], r5(hrs * PRICING["hourly"]))
 
 
-SERVICES = [
-    {"key": "standard", "slug": "standard-cleaning", "name": "Standard cleaning", "kind": "standard",
-     "h1": "Standard cleaning in Naples, FL", "short": "Kitchen, bathrooms, floors and dusting, done to a checklist.",
-     "lead": "A full top-to-bottom clean of the rooms you live in: kitchen, bathrooms, bedrooms and living areas, done to the same checklist every visit.",
-     "included": ["Kitchen counters, backsplash, sink and stovetop degreased", "Outside of fridge, oven and dishwasher; inside the microwave",
-                  "Bathrooms: shower, tub, toilet, sink, mirrors and glass", "Dusting of every reachable surface, fans and light switches",
-                  "Floors vacuumed and mopped, edges included", "Beds made, trash out, lanai furniture wiped"],
-     "good_for": "Homes that are lived in and kept up, or a one-time reset before guests arrive.",
-     "faq": [("How long does a standard clean take?", "About 3 hours for a 3-bedroom, 2-bathroom home with one cleaner. Larger homes get two cleaners."),
-             ("Is standard cleaning enough for a first visit?", "If the home was cleaned professionally in the last month, yes. Otherwise we recommend a deep clean first so later visits hold that level."),
-             ("Can I add the inside of the oven or fridge?", "Yes. Pick add-ons in the price tool; each is priced upfront.")]},
-    {"key": "deep", "slug": "deep-cleaning", "name": "Deep cleaning", "kind": "deep",
-     "h1": "Deep cleaning in Naples, FL", "short": "Baseboards, grout, cabinet fronts and the build-up a standard clean skips.",
-     "lead": "Everything in a standard clean, plus the build-up a regular clean doesn't reach: baseboards, door frames, cabinet fronts, grout and hard-water spots.",
-     "included": ["Everything in a standard clean", "Baseboards, door frames, vents and light fixtures", "Cabinet fronts and handles wiped down",
-                  "Grout scrubbed; hard-water spots on glass and fixtures", "Stovetop grates and burner caps degreased", "Window sills and tracks"],
-     "good_for": "First visits, homes that haven't had a professional clean in a while, and spring or holiday resets.",
-     "faq": [("What's the difference between standard and deep cleaning?", "A deep clean adds the detail work: baseboards, door frames, cabinet fronts, grout, hard-water spots and stovetop grates. It takes about one and a half times as long."),
-             ("How long does a deep clean take?", "About 5 hours for a 3-bedroom, 2-bathroom home with one cleaner, or less with two."),
-             ("Is the inside of the oven included?", "It's an add-on, priced upfront in the price tool, because ovens vary a lot."),
-             ("Do I need to move things before you arrive?", "Clear counters and floors where you can. We don't move heavy furniture.")]},
-    {"key": "moveout", "slug": "move-out-cleaning", "name": "Move-in and move-out cleaning", "kind": "moveout",
-     "h1": "Move-out cleaning in Naples, FL", "short": "Empty-home cleans timed to your closing or lease end.",
-     "lead": "Empty-home cleaning for move-ins and move-outs, timed to your closing or lease end, with finish photos you can send to the landlord, buyer or property manager.",
-     "included": ["Inside every cabinet, drawer and closet", "Inside the fridge, oven and microwave", "Kitchen and bathrooms scrubbed and disinfected",
-                  "Baseboards, door frames, vents and switches", "Floors vacuumed and mopped throughout", "Finish photos sent the same day"],
-     "good_for": "Tenants getting a deposit back, sellers before closing, buyers before moving in, and realtors and property managers between occupants.",
-     "faq": [("Does the home need to be empty?", "Yes, or nearly. Furniture left in place limits what we can reach, especially floors and closets."),
-             ("Will this get my deposit back?", "We clean to the standard most Naples landlords inspect for, and send photos you can share. The deposit decision is your landlord's."),
-             ("Do you work with realtors and property managers?", "Yes. We work from lockboxes, schedule around showings and closings, and send photos for your file."),
-             ("Do you clean before a move-in too?", "Yes. The same service works for a home you're moving into.")]},
-    {"key": "airbnb", "slug": "airbnb-cleaning", "name": "Airbnb and vacation rental cleaning", "kind": "airbnb",
-     "h1": "Airbnb cleaning in Naples, FL", "short": "Turnovers between check-out and check-in, with photos for the host.",
-     "lead": "Turnover cleaning between check-out and check-in for Airbnb and VRBO homes in Naples, with photos of anything broken, missing or running low.",
-     "included": ["Full turnover clean of kitchen, bathrooms and floors", "Beds made with the host's linens", "Trash out, dishes done, surfaces reset",
-                  "Restock check against your list", "Photos of damage or missing items sent to you", "Same-day turnovers between check-out and check-in"],
-     "good_for": "Hosts, co-hosts and rental managers who need dependable turnovers on a schedule.",
-     "faq": [("Do you provide linens?", "We use the host's linens and can add laundry to each turnover."),
-             ("Can you work from my booking calendar?", "Yes. Share your calendar or a schedule and we'll book turnovers around check-outs."),
-             ("What if a guest leaves damage?", "We photograph it and text you before we leave, so you can file with the platform.")]},
-    {"key": "recurring", "slug": "recurring-cleaning", "name": "Recurring cleaning", "kind": "standard",
-     "h1": "Recurring house cleaning in Naples, FL", "short": "Weekly, every two weeks or monthly, with the same cleaner when possible.",
-     "lead": "Standard cleaning on a schedule: weekly, every two weeks or monthly. The more often we come, the less each visit costs.",
-     "included": ["Everything in a standard clean, every visit", "Weekly saves 20%, every two weeks saves 15%, monthly saves 10%",
-                  "Request the same cleaner each visit", "Skip or move a visit with 48 hours' notice", "First visit is a deep clean, so every visit after holds that level", "Pay after each clean"],
-     "good_for": "Busy households, retirees and anyone who wants the house kept up without thinking about it.",
-     "faq": [("How often should I book?", "Every two weeks suits most homes. Weekly works best with kids or pets. Monthly keeps a quiet home in shape."),
-             ("Can I keep the same cleaner?", "Yes, you can request the same cleaner each visit and we'll match you whenever possible."),
-             ("Can I pause for the summer?", "Yes. Tell us 48 hours before your next visit.")]},
-]
-SVC = {s["key"]: s for s in SERVICES}
+def monthly_price(kind, sqft, restrooms, nights):
+    return r5(visit_price(kind, sqft, restrooms) * nights * PRICING["weeks_per_month"])
 
-LOCATIONS = [
-    {"slug": "old-naples", "name": "Old Naples", "zips": ["34102"],
-     "lead": "House cleaning in Naples' historic district, from beach cottages off Gulf Shore Boulevard to newer homes a few blocks from Fifth Avenue South.",
-     "body": ["Old Naples runs from the Naples Pier to the shops of Fifth Avenue South and Third Street South. Homes here range from older cottages to large new builds, and many sit a short walk from the beach.",
-              "Beach sand is the constant. Our checklist for homes near the Gulf includes entry floors, sliding-door tracks and lanai furniture on every visit.",
-              "Many Old Naples owners are away part of the year. We clean from lockbox or keypad access and text finish photos when we're done."]},
-    {"slug": "park-shore", "name": "Park Shore", "zips": ["34103"],
-     "lead": "Condo and home cleaning in Park Shore, between Gulf Shore Boulevard's high-rises and Venetian Bay.",
-     "body": ["Park Shore mixes Gulf-front high-rise condos with single-family homes along the waterways off Venetian Bay.",
-              "For condo buildings, we follow the association's rules on service hours, parking and elevators, and send any vendor paperwork before the first visit.",
-              "Condos here are often furnished rentals or second homes. We clean between guests or before owners arrive, with photos for anyone who isn't there."]},
-    {"slug": "pelican-bay", "name": "Pelican Bay", "zips": ["34108"],
-     "lead": "House and condo cleaning in Pelican Bay, the planned community between US 41 and the Gulf.",
-     "body": ["Pelican Bay is a planned community of high-rise condos, villas and single-family homes, with private beach facilities reached by boardwalks.",
-              "Gated entries mean access needs to be set up ahead of time. We confirm gate and building access when you book, so your cleaner isn't turned away.",
-              "Owners here often book a deep clean when they arrive for the season, then cleans every two weeks until they leave."]},
-    {"slug": "vanderbilt-beach", "name": "Vanderbilt Beach", "zips": ["34108"],
-     "lead": "Cleaning for beachfront condos and homes around Vanderbilt Beach Road.",
-     "body": ["Around Vanderbilt Beach Road you'll find Gulf-front condo towers, older single-family homes and short-term rentals within walking distance of the sand.",
-              "Short-term rentals here need fast, dependable turnovers. We clean between check-out and check-in and photograph anything a guest broke or used up.",
-              "For year-round homes, a clean every two weeks keeps sand and salt film under control."]},
-    {"slug": "north-naples", "name": "North Naples", "zips": ["34109", "34110", "34119"],
-     "lead": "House cleaning across North Naples, from Naples Park to the gated communities off Immokalee Road.",
-     "body": ["North Naples covers established neighborhoods like Naples Park as well as newer gated communities east of I-75 and around Mercato.",
-              "Most homes here are single-family houses with three or more bedrooms, where a clean every two weeks is the usual rhythm.",
-              "Moving within North Naples? Book a move-out clean for the old place and a move-in clean for the new one."]},
-    {"slug": "east-naples", "name": "East Naples", "zips": ["34112", "34113", "34114"],
-     "lead": "House cleaning in East Naples, from the neighborhoods near Naples Bay to Lely and the communities along Collier Boulevard.",
-     "body": ["East Naples stretches from the neighborhoods near Naples Bay and the Naples Botanical Garden out to golf communities around Lely and Collier Boulevard.",
-              "Homes here are mostly single-family houses and villas. Many families book a deep clean first, then a recurring plan.",
-              "Rentals turn over often in East Naples. Our move-out clean covers the inside of every cabinet and appliance, with photos for the landlord."]},
-]
 
-PHOTOS = {
-    "pier_sea_grapes": {"file": "naples-pier-beach-sea-grapes.webp", "w": 960, "h": 699, "alt": "Naples Pier seen from the beach past sea grape bushes", "caption": "Naples Pier from the beach, Old Naples"},
-    "pier_walkers": {"file": "naples-pier-walkers.webp", "w": 1600, "h": 1040, "alt": "People walking under the wooden Naples Pier", "caption": "Under the Naples Pier"},
-    "pier_plaque": {"file": "naples-pier-historic-plaque.webp", "w": 1200, "h": 900, "alt": "Historic marker for the Naples Pier, built in 1888", "caption": "The Naples Pier marker: built in 1888"},
-    "surf": {"file": "gulf-surf-on-sand.webp", "w": 1200, "h": 750, "alt": "Surf breaking on golden sand", "caption": ""},
-    "palms": {"file": "palms-on-the-beach.webp", "w": 1600, "h": 1000, "alt": "Palm trees on a bright beach", "caption": ""},
-    "wide_beach": {"file": "wide-beach-with-palms.webp", "w": 1600, "h": 1000, "alt": "A wide sandy beach lined with palms", "caption": ""},
-}
-CREDITS = ('Naples Pier photos: <a href="https://commons.wikimedia.org/wiki/File:Naples_Pier_R04.jpg">MJJR</a>, '
-           '<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, via Wikimedia Commons. '
-           'Beach photos: Sarah Bürvenich, Florian Klauer and Paula Borowska, via Unsplash.')
-
-FAQ = [
-    ("How much does house cleaning cost in Naples?", f"Our standard clean starts at ${price('standard', 1, 1)} for a 1-bedroom, 1-bathroom home, and a 3-bedroom, 2-bathroom home is ${price('standard', 3, 2)}. Recurring plans save up to 20%. The price tool shows your exact price before you book."),
-    ("Do I need to be home during the clean?", "No. Many clients are at work or out of town. Leave a key in a lockbox or give us a door or gate code, and we'll text you when we're done."),
-    ("Do you bring cleaning supplies?", "Yes, every time. If you prefer a product, leave it out and we'll use it."),
-    ("What's your guarantee?", "If something isn't right, tell us within 48 hours and we'll come back and re-clean it free. If it's still not right after that, we refund the clean."),
-    ("How do I pay?", "You pay after the clean is finished, never before."),
-    ("Can I get the same cleaner every time?", "Yes. Ask for the same cleaner and we'll match you whenever possible."),
-    ("What's the difference between standard and deep cleaning?", "A deep clean adds detail work a standard clean skips: baseboards, door frames, cabinet fronts, grout and hard-water spots."),
-    ("Do you clean Airbnbs and vacation rentals?", "Yes. We do turnovers between guests and photograph anything broken, missing or running low."),
-    ("What's your cancellation policy?", "Move or cancel free with 48 hours' notice."),
-    ("Which areas do you serve?", "All of Naples, including Old Naples, Park Shore, Pelican Bay, Vanderbilt Beach, North Naples and East Naples."),
-]
-
-E = html.escape
+def postcon_price(sqft):
+    return max(PRICING["postcon_min"], r5(sqft * PRICING["postcon_per_sqft"]))
 
 
 # ---------------------------------------------------------------------------
-# Page model: live site uses nested clean URLs, preview uses flat files
+# Content
+# ---------------------------------------------------------------------------
+PHOTOS = {
+    "bridge": {"file": "brooklyn-bridge-lower-manhattan-night.webp", "w": 1800, "h": 1200, "alt": "The Brooklyn Bridge and Lower Manhattan lit up at night"},
+    "windows": {"file": "lit-office-windows-at-night.webp", "w": 1600, "h": 1067, "alt": "Rows of lit office windows on a tower at night"},
+    "morning": {"file": "morning-at-office-windows.webp", "w": 1600, "h": 1067, "alt": "People at tall office windows looking over the city in the morning"},
+    "rain": {"file": "rain-on-window-city-lights.webp", "w": 1400, "h": 875, "alt": "Rain on a window with city lights behind it at dusk"},
+}
+CREDITS = "Photos: Oleg Chursin, Vladimir Kudinov, Charles Forerunner and Riley Briggs, via Unsplash."
+
+SERVICES = [
+    {"key": "medical", "slug": "medical-office-cleaning", "name": "Medical office cleaning", "kind": "medical",
+     "h1": "Medical office cleaning in NYC", "title": "Medical Office Cleaning NYC & Long Island | Clean by Morning",
+     "lead": "Evening cleaning for medical practices in Brooklyn, Manhattan and Nassau County, done to a written checklist and finished before your first patient.",
+     "nightly": ["Exam rooms: counters, chairs, door handles and light switches disinfected", "Waiting room: seats, front desk and touch points wiped; floors vacuumed and mopped",
+                 "Restrooms scrubbed and disinfected; paper and soap restocked", "Trash and recycling out to your building's area", "Hard floors damp-mopped with a clean head for every area",
+                 "Break room: counters, sink, microwave and fridge front"],
+     "clinical": ["Color-coded microfiber: restroom cloths never touch exam rooms", "EPA-registered disinfectants, left wet for the label's contact time",
+                  "We never handle sharps containers or regulated medical waste; those stay with your licensed hauler", "We don't open files, drawers or screens. Patient information stays where you left it"],
+     "faq": [("Do you clean exam rooms every night?", "Yes. Every exam room on the schedule gets its surfaces and touch points disinfected each visit."),
+             ("Do you handle medical waste?", "No. Sharps containers and regulated medical waste are handled by your licensed medical waste hauler. We empty regular trash and recycling only."),
+             ("Which disinfectants do you use?", "EPA-registered hospital disinfectants, applied and left wet for the contact time on the label. If your practice has a required product, we'll use it.")]},
+    {"key": "dental", "slug": "dental-office-cleaning", "name": "Dental office cleaning", "kind": "dental",
+     "h1": "Dental office cleaning in NYC", "title": "Dental Office Cleaning NYC & Long Island | Clean by Morning",
+     "lead": "Nightly cleaning for dental practices: operatory floors and surfaces outside the clinical zone, sterilization-area floors, reception and restrooms.",
+     "nightly": ["Operatories: floors, counters outside the clinical zone, door handles and switches", "Sterilization area floors and sinks",
+                 "Reception: front desk, chairs and the coffee or water station", "Restrooms scrubbed, disinfected and restocked",
+                 "Trash and recycling out", "Hard floors damp-mopped; carpets vacuumed"],
+     "clinical": ["We clean around dental chairs and equipment without moving or switching anything on", "Your clinical team keeps chairside surface disinfection between patients; we do the room",
+                  "Color-coded microfiber and EPA-registered disinfectants", "We never handle sharps, amalgam or regulated waste"],
+     "faq": [("Do you disinfect the dental chairs?", "Chairside surfaces between patients stay with your clinical team. At night we clean the operatory floors, counters outside the clinical zone and every touch point."),
+             ("Can you clean after late appointments?", "Yes. We schedule around your last appointment, including late evenings."),
+             ("How many nights a week do dental offices need?", "Most practices book three to five nights. The estimator shows the price for each.")]},
+    {"key": "office", "slug": "office-cleaning", "name": "Office cleaning", "kind": "office",
+     "h1": "Office cleaning in NYC", "title": "Office Cleaning NYC & Long Island | Clean by Morning",
+     "lead": "Evening office cleaning for small and mid-size offices: desks, kitchens, restrooms and floors, ready before your team arrives.",
+     "nightly": ["Desks and work surfaces wiped where clear", "Kitchen: counters, sink, microwave, appliance fronts", "Restrooms scrubbed and restocked",
+                 "Trash and recycling out", "Floors vacuumed and mopped", "Doors, handles, switches and glass smudges"],
+     "clinical": ["Same cleaner and checklist each night whenever possible", "Keys and alarm codes stored securely; we arm the alarm when we leave",
+                  "Photos texted after the clean, if you want them", "Supplies included; restroom paper and soap restocked at cost"],
+     "faq": [("Do you clean desks?", "We wipe clear desk surfaces. We don't move papers or touch computers."),
+             ("How often should an office be cleaned?", "Most offices book two to five nights a week, depending on headcount and kitchen use."),
+             ("Can you clean during the day?", "We focus on evenings so your team isn't disturbed. Ask about day porter work.")]},
+    {"key": "gym", "slug": "gym-cleaning", "name": "Gym and studio cleaning", "kind": "gym",
+     "h1": "Gym and studio cleaning in NYC", "title": "Gym & Studio Cleaning NYC & Long Island | Clean by Morning",
+     "lead": "Nightly cleaning for gyms, yoga and pilates studios: floors, mats, locker rooms and equipment touch points, done after your last class.",
+     "nightly": ["Studio floors cleaned with products safe for your flooring", "Equipment touch points: handles, benches, consoles",
+                 "Locker rooms and showers scrubbed and disinfected", "Mirrors and glass", "Front desk and lobby", "Trash out and liners replaced"],
+     "clinical": ["We schedule after your last class and finish before your first", "Floor products matched to your surface: wood, rubber or vinyl",
+                  "Showers and drains get extra time", "Photos of locker rooms texted after each clean, if you want them"],
+     "faq": [("Do you clean the equipment?", "We wipe and disinfect touch points on equipment every visit. Deep equipment cleaning is a separate quote."),
+             ("Can you clean every night?", "Yes. Many gyms book five to seven nights a week."),
+             ("Do you do showers and locker rooms?", "Yes, every visit, including drains and grout.")]},
+    {"key": "postcon", "slug": "post-construction-cleaning", "name": "Post-construction cleaning", "kind": "postcon",
+     "h1": "Post-construction cleaning in NYC", "title": "Post-Construction Cleaning NYC & Long Island | Clean by Morning",
+     "lead": "A one-time clean after a build-out or renovation, so a new office or practice can open: dust, debris, windows, fixtures and floors.",
+     "nightly": ["Construction dust removed from every surface, ledge and vent", "Interior windows, frames and sills", "Fixtures, cabinets and drawers inside and out",
+                 "Floors vacuumed, scrubbed and mopped", "Stickers, paint spots and adhesive removed where safe", "Final wipe-down so the space is move-in ready"],
+     "clinical": [f"Priced per square foot, from ${postcon_price(1000):,} for small spaces", f"{int(PRICING['deposit'] * 100)}% deposit to book, the rest when the space passes your walkthrough",
+                  "We coordinate with your contractor's punch list", "Medical and dental build-outs cleaned to opening standard"],
+     "faq": [("When should post-construction cleaning happen?", "After trades finish and before furniture or equipment moves in. A second light clean after move-in is often worth it."),
+             ("How is it priced?", f"By square foot, about ${PRICING['postcon_per_sqft']:.2f} per square foot with a ${PRICING['postcon_min']} minimum, confirmed at the walkthrough."),
+             ("Do you remove construction debris?", "We remove dust and small debris. Large debris and dumpsters stay with your contractor.")]},
+]
+SVC = {s["key"]: s for s in SERVICES}
+
+AREAS = [
+    {"slug": "brooklyn", "name": "Brooklyn", "h1": "Office cleaning in Brooklyn",
+     "hoods": ["Downtown Brooklyn", "Brooklyn Heights", "Park Slope", "Williamsburg", "DUMBO", "Bay Ridge", "Bensonhurst", "Sheepshead Bay"],
+     "lead": "Evening cleaning for medical, dental and office spaces across Brooklyn, from Downtown towers to ground-floor practices on the avenues.",
+     "body": ["A lot of Brooklyn practices sit on the ground floor of a brownstone or a mixed-use building, with a street entrance and no freight elevator. We carry our own equipment and work around what the building allows.",
+              "Downtown Brooklyn and DUMBO have newer office buildings with security desks. We register with the building before the first night, so the guard knows who we are.",
+              "We drive to every job, which means we can serve Bay Ridge, Bensonhurst and Sheepshead Bay as easily as the neighborhoods by the bridges."]},
+    {"slug": "manhattan", "name": "Manhattan", "h1": "Office cleaning in Manhattan",
+     "hoods": ["the Financial District", "Tribeca", "the Flatiron District", "Midtown", "Murray Hill", "the Upper East Side", "the Upper West Side"],
+     "lead": "After-hours cleaning for medical practices and small offices in Manhattan, scheduled around building rules and security desks.",
+     "body": ["Most Manhattan office buildings require vendors to send a certificate of insurance naming building management before working after hours. We send it before your first night.",
+              "Many medical practices on the Upper East Side and in Murray Hill share buildings with other offices, so the clean has to fit the building's service hours. We plan the route around them.",
+              "We clean small and mid-size spaces: single-floor practices, studios and offices up to about 15,000 square feet."]},
+    {"slug": "nassau-county", "name": "Nassau County", "h1": "Office cleaning in Nassau County",
+     "hoods": ["Garden City", "Mineola", "Great Neck", "Manhasset", "Lake Success", "Hicksville", "Rockville Centre", "Massapequa"],
+     "lead": "Evening cleaning for medical offices, dental practices and office parks across Nassau County, Long Island.",
+     "body": ["Nassau has a large share of medical and dental practices in office parks and medical buildings with their own parking, which makes evening cleaning straightforward.",
+              "Practices in Garden City, Mineola, Great Neck and Lake Success often run late appointments. We schedule after the last patient and finish before the morning team.",
+              "We're a short drive from the city line, so Nassau accounts get the same checklist and the same nightly photos as our NYC clients."]},
+]
+
+FAQ = [
+    ("How much does office cleaning cost?", f"We charge by cleaning time: about ${PRICING['hourly']} per hour, with a ${PRICING['min_visit']} minimum per visit. A 2,000 square foot medical office cleaned three nights a week is about ${monthly_price('medical', 2000, 2, 3):,} a month. The estimator shows your number."),
+    ("When do you clean?", "After you close, usually between 6 PM and 2 AM. You pick the nights, and we're done before you open."),
+    ("Who does the cleaning?", "Clean by Morning is owner-operated. The owner cleans or inspects every account, so you have one person responsible."),
+    ("Do you clean medical and dental offices?", "Yes, they're most of what we do. We use color-coded microfiber and EPA-registered disinfectants, and we never handle sharps or regulated medical waste."),
+    ("How do I pay?", "Monthly, by ACH autopay on the 1st. The first month is paid before the first clean. One-time jobs take a 50% deposit."),
+    ("Is there a long contract?", "No. It's month to month. Either side can end it with 30 days' notice."),
+    ("Do you bring supplies?", "Yes. Restroom paper, soap and liners can be restocked at cost, or you can supply your own."),
+    ("How do keys and alarms work?", "You give us a key or fob and an alarm code. We store them securely, arm the alarm when we leave, and text you when we're done."),
+    ("How fast can you start?", "Usually within a week of the walkthrough."),
+]
+
+
+def proof_lines():
+    out = []
+    if PROOF["insured"]:
+        out.append("General liability insured; certificate available on request")
+    if PROOF["bonded"]:
+        out.append("Bonded")
+    if PROOF["workers_comp"]:
+        out.append("Workers' compensation insured")
+    if PROOF["review_count"] and PROOF["rating"]:
+        out.append(f'{PROOF["rating"]} stars from {PROOF["review_count"]} Google reviews')
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Page model: nested clean URLs live, flat files in preview
 # ---------------------------------------------------------------------------
 def live_path(key):
     if key == "index":
         return "/"
     if key.startswith("svc:"):
-        return f"/services/{SVC[key[4:]]['slug']}/naples-fl/"
-    if key.startswith("loc:"):
-        return f"/locations/{key[4:]}/"
+        return f"/services/{SVC[key[4:]]['slug']}/"
+    if key.startswith("area:"):
+        return f"/areas/{key[5:]}/"
     return f"/{key}/"
 
 
@@ -222,9 +213,7 @@ def live_file(key):
 
 
 def preview_file(key):
-    if key == "index":
-        return "home.html"
-    return key.replace(":", "-") + ".html"
+    return "home.html" if key == "index" else key.replace(":", "-").replace("/", "-") + ".html"
 
 
 class Ctx:
@@ -240,17 +229,11 @@ class Ctx:
     def asset(self, name):
         return name if self.preview else "/" + name
 
-    def img(self, key, cls="", sizes="", lazy=True, extra=""):
+    def img(self, key, lazy=True):
         p = PHOTOS[key]
-        return (f'<img class="{cls}" src="{self.asset("img/" + p["file"])}" alt="{E(p["alt"])}" width="{p["w"]}" height="{p["h"]}"'
-                f'{" loading=\"lazy\"" if lazy else ""} decoding="async"{extra}>')
-
-
-def wordmark(tag="span", cls="wordmark", href=None):
-    inner = 'sunnym<span class="sun-o" aria-hidden="true"></span>p'
-    if href:
-        return f'<a class="{cls}" href="{href}" aria-label="SunnyMop home">{inner}</a>'
-    return f'<{tag} class="{cls}" aria-label="SunnyMop">{inner}</{tag}>'
+        loading = ' loading="lazy"' if lazy else ""
+        return (f'<img src="{self.asset("img/" + p["file"])}" alt="{E(p["alt"])}" '
+                f'width="{p["w"]}" height="{p["h"]}"{loading} decoding="async">')
 
 
 def jsonld(o):
@@ -258,12 +241,12 @@ def jsonld(o):
 
 
 def business_schema():
-    s = {"@context": "https://schema.org", "@type": "LocalBusiness",
-         "@id": B["domain"] + "/#business", "name": B["name"], "url": B["domain"] + "/",
-         "telephone": B["phone_e164"], "email": B["email"], "priceRange": "$$$",
-         "description": "Premium house cleaning in Naples, Florida: standard, deep, move-in and move-out, Airbnb and recurring cleaning.",
-         "areaServed": {"@type": "City", "name": "Naples, FL"}, "openingHours": B["hours_schema"],
-         "image": B["domain"] + "/img/" + PHOTOS["pier_sea_grapes"]["file"], "sameAs": B["same_as"]}
+    s = {"@context": "https://schema.org", "@type": "LocalBusiness", "@id": B["domain"] + "/#business",
+         "name": B["name"], "legalName": B["legal_name"], "url": B["domain"] + "/", "telephone": B["phone_e164"], "email": B["email"],
+         "description": "Evening commercial cleaning for medical offices, dental practices, offices and gyms in Brooklyn, Manhattan and Nassau County.",
+         "areaServed": [{"@type": "City", "name": "Brooklyn, NY"}, {"@type": "City", "name": "Manhattan, NY"}, {"@type": "AdministrativeArea", "name": "Nassau County, NY"}],
+         "priceRange": "$$", "openingHours": B["hours_schema"], "image": B["domain"] + "/img/" + PHOTOS["bridge"]["file"], "sameAs": B["same_as"],
+         "makesOffer": [{"@type": "Offer", "itemOffered": {"@type": "Service", "name": s["name"]}} for s in SERVICES]}
     if PROOF["review_count"] and PROOF["rating"]:
         s["aggregateRating"] = {"@type": "AggregateRating", "ratingValue": PROOF["rating"], "reviewCount": PROOF["review_count"]}
     return s
@@ -279,99 +262,101 @@ def faq_schema(items):
             "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in items]}
 
 
-def promises():
-    items = ["Prices shown upfront", "Free re-clean within 48 hours", "Pay after the clean"]
-    if PROOF["insured"]:
-        items.insert(0, "Insured")
-    if PROOF["bonded"]:
-        items.insert(0, "Bonded")
-    if PROOF["background_checked"]:
-        items.insert(0, "Background-checked cleaners")
-    if PROOF["review_count"] and PROOF["rating"]:
-        items.insert(0, f'{PROOF["rating"]} stars from {PROOF["review_count"]} Google reviews')
-    return '<ul class="promise">' + "".join(f'<li><span class="dot" aria-hidden="true"></span>{E(t)}</li>' for t in items) + "</ul>"
+def crumbs(ctx, label):
+    return f'<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">{E(label)}</li></ol></nav>'
 
 
-NAV = [("svc:standard", "Services"), ("index#areas", "Areas"), ("pricing", "Pricing"), ("faq", "FAQ"), ("contact", "Contact")]
+def page_head(ctx, h1, lead, photo, second=None):
+    extra = f'<a class="btn btn-line" href="{second[1]}">{E(second[0])}</a>' if second else ""
+    return f'''<section class="wrap page-head"><div class="copy reveal"><h1>{E(h1)}</h1><p class="lead">{E(lead)}</p>
+<div class="hero-cta" style="justify-content:flex-start"><a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a>{extra}</div></div>
+<div class="head-photo tint shutter">{ctx.img(photo, lazy=False)}</div></section>'''
+
+
+def photo_row(ctx, keys, caption):
+    figs = "".join(f'<div class="tint">{ctx.img(k)}</div>' for k in keys)
+    return f'<section class="section"><div class="wrap"><figure class="photo-row reveal">{figs}<figcaption class="small">{E(caption)}</figcaption></figure></div></section>'
+
+
+# ---------------------------------------------------------------------------
+# Shell
+# ---------------------------------------------------------------------------
+NAV = [("services", "Services"), ("areas", "Areas"), ("pricing", "Pricing")]
 
 
 def nav_href(ctx, k):
-    if "#" in k:
-        base, anc = k.split("#")
-        return ctx.href(base, "#" + anc)
-    if k == "svc:standard":
-        return ctx.href("index", "#services")
+    if k == "services":
+        return ctx.href("svc:medical")
+    if k == "areas":
+        return ctx.href("index", "#areas")
     return ctx.href(k)
 
 
 def header(ctx, active):
     cur = ' aria-current="page"'
-    links = "".join(f'<a href="{nav_href(ctx, k)}"{cur if k == active else ""}>{E(n)}</a>' for k, n in NAV)
-    menu = "".join(f'<a href="{nav_href(ctx, k)}">{E(n)}</a>' for k, n in NAV)
+    links = "".join(f'<a href="{nav_href(ctx, k)}"{cur if k == active else ""}>{n}</a>' for k, n in NAV)
+    menu = "".join(f'<a href="{ctx.href("svc:" + s["key"])}">{E(s["name"])}</a>' for s in SERVICES)
+    menu += "".join(f'<a href="{ctx.href("area:" + a["slug"])}">{E(a["name"])}</a>' for a in AREAS)
+    menu += f'<a href="{ctx.href("pricing")}">Pricing</a><a href="{ctx.href("faq")}">FAQ</a><a href="{ctx.href("guides")}">Guides</a><a href="{ctx.href("walkthrough")}">Book a walkthrough</a>'
     bar = ""
     if ctx.preview:
-        bar = ('<div class="preview-bar"><div class="wrap"><strong>Preview</strong><span>Phone, email, domain, offer amount and openings are placeholders.</span>'
-               '<a href="brand-kit.html">Brand kit</a><a href="checklist.html">Launch checklist</a><a href="home.html">Home</a></div></div>')
+        bar = ('<div class="preview-bar"><div class="wrap"><strong>Preview</strong><span>The phone number is a placeholder. The form opens an email until a form service is connected.</span>'
+               '<a href="one-pager.html">Capability statement</a><a href="home.html">Home</a></div></div>')
     return f'''{bar}<header class="site-header"><div class="wrap">
-{wordmark(href=ctx.href("index"))}
+<a class="wordmark" href="{ctx.href("index")}">Clean by Morning</a>
 <nav class="nav" aria-label="Main">{links}</nav>
-<a class="btn btn-sun header-cta" href="{ctx.href("book")}">Get my price</a>
-<details class="menu"><summary>Menu</summary><div class="menu-panel">{menu}<a href="{ctx.href("book")}">Get my price</a></div></details>
+<a class="btn btn-paper header-cta" href="{ctx.href("walkthrough")}">Book a walkthrough</a>
+<details class="menu"><summary>Menu</summary><nav class="menu-panel" aria-label="Menu">{menu}</nav></details>
 </div></header>'''
 
 
-def action_bar(ctx):
-    return (f'<div class="action-bar"><a class="btn btn-plain" href="sms:{B["phone_e164"]}">Text us</a>'
-            f'<a class="btn btn-sun" href="{ctx.href("book")}">Get my price</a></div>')
-
-
 def footer(ctx):
-    svc = "".join(f'<li><a href="{ctx.href("svc:" + s["key"])}">{E(s["name"])}</a></li>' for s in SERVICES)
-    loc = "".join(f'<li><a href="{ctx.href("loc:" + l["slug"])}">{E(l["name"])}</a></li>' for l in LOCATIONS)
-    co = "".join(f'<li><a href="{ctx.href(k)}">{n}</a></li>' for k, n in [("pricing", "Pricing"), ("faq", "FAQ"), ("about", "About"), ("contact", "Contact"), ("book", "Book a clean")])
-    social = "".join(f'<li><a href="{E(u)}">{E(u.split("//")[-1].split("/")[0])}</a></li>' for u in B["same_as"])
+    svc = " · ".join(f'<a href="{ctx.href("svc:" + s["key"])}">{E(s["name"])}</a>' for s in SERVICES)
+    areas = " · ".join(f'<a href="{ctx.href("area:" + a["slug"])}">{E(a["name"])}</a>' for a in AREAS)
+    social = " · ".join(f'<a href="{E(u)}">{E(u.split("//")[-1].split("/")[0])}</a>' for u in B["same_as"])
     return f'''<footer class="site-footer"><div class="wrap">
-<p class="big-mark" aria-hidden="true">sunnym<span class="sun-o"></span>p</p>
-<div class="foot-cols">
-<div><h2>Services</h2><ul>{svc}</ul></div>
-<div><h2>Naples areas</h2><ul>{loc}</ul></div>
-<div><h2>Company</h2><ul>{co}</ul></div>
-{f'<div><h2>Find us</h2><ul>{social}</ul></div>' if social else ""}
-<div><h2>SunnyMop, Naples, FL</h2><ul><li>Call or text <span class="num">{E(B["phone_display"])}</span></li><li>{E(B["email"])}</li><li>{E(B["hours"])}</li><li>All Naples zip codes</li></ul></div>
-</div>
-<p class="credits">{CREDITS}</p>
-<div class="foot-last"><span>© {B["year"]} SunnyMop. House cleaning in Naples, Florida.</span><a class="btn btn-ink" href="{ctx.href("book")}">Get my price</a></div>
+<div class="foot-top"><div class="foot-notes"><strong>Clean by Morning</strong><span>Evening cleaning for medical, dental and office spaces in Brooklyn, Manhattan and Nassau County.</span>
+<span>{E(B["cleaning_hours"])}. {E(B["office_hours"])}.</span></div><a href="#main">Back to top</a></div>
+<a class="phone-line num" href="tel:{B["phone_e164"]}">{E(B["phone_display"])}</a>
+<div class="foot-links"><span>{svc}</span><span>{areas}</span><span><a href="{ctx.href("pricing")}">Pricing</a> · <a href="{ctx.href("faq")}">FAQ</a> · <a href="{ctx.href("guides")}">Guides</a> · <a href="{ctx.href("about")}">About</a> · <a href="{ctx.href("walkthrough")}">Walkthrough</a></span>{f"<span>{social}</span>" if social else ""}</div>
+<div class="foot-meta"><span>{E(B["email"])}</span><span>{CREDITS}</span><span>{E(B["city_line"])} · © {B["year"]} {E(B["legal_name"])}</span></div>
 </div></footer>'''
 
 
-def page(ctx, key, title, desc, body, active=None, schema=(), noindex=False, wrapper=True, scripts=()):
+def action_bar(ctx):
+    return (f'<div class="action-bar"><a class="btn btn-line" href="tel:{B["phone_e164"]}">Call</a>'
+            f'<a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a></div>')
+
+
+def page(ctx, key, title, desc, body, active=None, schema=(), noindex=False, wrapper=True):
     canon = ctx.canonical(key)
     ga = ""
     if B["ga4_id"] and not ctx.preview:
         ga = (f'<script async src="https://www.googletagmanager.com/gtag/js?id={B["ga4_id"]}"></script>'
               f'<script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments)}}gtag("js",new Date());gtag("config","{B["ga4_id"]}");</script>')
+    cfg = {"pricing": PRICING, "email": B["email"], "phone": B["phone_e164"], "phoneDisplay": B["phone_display"],
+           "formEndpoint": B["form_endpoint"], "walkthrough": ctx.href("walkthrough")}
     head = f'''<title>{E(title)}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<script>document.documentElement.classList.add("js");window.CBM={json.dumps(cfg)};</script>
 <meta name="description" content="{E(desc)}">
 {'<meta name="robots" content="noindex">' if noindex else ""}
 <link rel="canonical" href="{canon}">
 <meta property="og:type" content="website"><meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
-<meta property="og:url" content="{canon}"><meta property="og:site_name" content="SunnyMop">
-<meta property="og:image" content="{B["domain"]}/img/{PHOTOS["pier_sea_grapes"]["file"]}"><meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#ffc61a">
+<meta property="og:url" content="{canon}"><meta property="og:site_name" content="Clean by Morning">
+<meta property="og:image" content="{B["domain"]}/img/{PHOTOS["bridge"]["file"]}"><meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0034eb">
 <link rel="icon" href="{ctx.asset("favicon.svg")}" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;800&display=swap">
+<link rel="preload" href="{ctx.asset("fonts/sentient-300.woff2")}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{ctx.asset("styles.css")}">
 {ga}{"".join(jsonld(s) for s in schema)}'''
-    js = "".join(f'<script src="{ctx.asset(s)}" defer></script>' for s in scripts)
     content = f'''{header(ctx, active)}
 <main id="main">
 {body}
 </main>
 {footer(ctx)}
 {action_bar(ctx)}
-{js}'''
+<script src="{ctx.asset("site.js")}" defer></script>'''
     if not wrapper:
         return head + "\n" + content + "\n"
     return f'''<!doctype html>
@@ -391,425 +376,337 @@ def page(ctx, key, title, desc, body, active=None, schema=(), noindex=False, wra
 # ---------------------------------------------------------------------------
 # Components
 # ---------------------------------------------------------------------------
-def quote_widget(ctx, preset="standard", heading="Your price"):
-    opts = [("standard", "Standard"), ("deep", "Deep"), ("moveout", "Move-in / move-out"), ("airbnb", "Airbnb turnover")]
-    sel = "".join(f'<option value="{k}"{" selected" if k == preset else ""}>{n}</option>' for k, n in opts)
-    beds = "".join(f'<option value="{n}"{" selected" if n == 3 else ""}>{n} bed</option>' for n in range(1, 7))
-    baths = "".join(f'<option value="{n}"{" selected" if n == 2 else ""}>{n} bath</option>' for n in range(1, 6))
-    freqs = "".join(f'<label class="chip"><input type="radio" name="freq" id="freq-{k}" value="{k}"{" checked" if k == ("biweekly" if preset == "recurring" else "once") else ""}><span>{n}</span></label>'
-                    for k, n in [("once", "One time"), ("weekly", "Weekly −20%"), ("biweekly", "Every 2 weeks −15%"), ("monthly", "Monthly −10%")])
-    adds = "".join(f'<label class="chip"><input type="checkbox" name="addon" id="add-{k}" value="{k}"><span>{E(n.split(" (")[0])} +${p}</span></label>' for k, n, p in PRICING["addons"])
-    first = SVC["standard"]
-    initial = price("standard", 3, 2, "biweekly" if preset == "recurring" else "once") if preset in ("standard", "recurring") else price(preset, 3, 2)
-    return f'''<form class="quote" data-ui data-quote novalidate aria-label="Price and booking">
-<div class="quote-head"><h2>{E(heading)}</h2><p class="quote-total" aria-live="polite"><span data-total>${initial}</span><small data-per>per clean</small></p></div>
-<div class="fields">
-<div class="field field-wide"><label for="q-service">Type of clean</label><select id="q-service" name="service">{sel}</select></div>
-<div class="field"><label for="q-beds">Bedrooms</label><select id="q-beds" name="beds">{beds}</select></div>
-<div class="field"><label for="q-baths">Bathrooms</label><select id="q-baths" name="baths">{baths}</select></div>
-<div class="field field-wide" data-freq-field><fieldset><legend>How often</legend><div class="chips">{freqs}</div></fieldset></div>
-<div class="field field-wide"><fieldset><legend>Add-ons</legend><div class="chips">{adds}</div></fieldset></div>
-<div class="field field-wide"><label for="q-zip">Zip code</label><input id="q-zip" name="zip" inputmode="numeric" autocomplete="postal-code" maxlength="5" placeholder="341…"><span class="error" data-zip-msg role="status"></span></div>
-<div class="field field-wide"><fieldset><legend>Next openings</legend><div class="chips" data-slots></div><p class="slots-empty" data-slots-empty>Text us and we'll offer the next opening during business hours.</p></fieldset></div>
+def estimator(preset="medical"):
+    kinds = [("medical", "Medical"), ("dental", "Dental"), ("office", "Office"), ("gym", "Gym or studio"), ("postcon", "Post-construction, one time")]
+    chips = "".join(f'<label class="chip"><input type="radio" name="kind" value="{k}"{" checked" if k == preset else ""}><span>{n}</span></label>' for k, n in kinds)
+    nights = "".join(f'<label class="chip"><input type="radio" name="nights" value="{n}"{" checked" if n == 3 else ""}><span>{n}</span></label>' for n in range(1, 8))
+    rest = "".join(f'<option value="{n}"{" selected" if n == 2 else ""}>{n}</option>' for n in range(0, 9))
+    if preset == "postcon":
+        figure, detail = postcon_price(2000), "One-time clean, 2,000 sq ft."
+    else:
+        figure, detail = monthly_price(preset, 2000, 2, 3), f"About ${visit_price(preset, 2000, 2)} a visit, 3 nights a week."
+    return f'''<form class="estimator" data-ui data-estimator novalidate aria-label="Cleaning price estimator">
+<div class="est-fields">
+<h3>Estimate your price</h3>
+<fieldset class="field"><legend>Type of space</legend><div class="chips">{chips}</div></fieldset>
+<div class="field"><label for="e-sqft">Square feet: <span data-sqft-out class="num">2,000</span></label><input id="e-sqft" name="sqft" type="range" min="500" max="15000" step="250" value="2000"></div>
+<fieldset class="field" data-recurring><legend>Nights a week</legend><div class="chips">{nights}</div></fieldset>
+<div class="field" data-recurring><label for="e-rest">Restrooms</label><select id="e-rest" name="restrooms">{rest}</select></div>
 </div>
-<div class="quote-actions"><button class="btn btn-ink" type="submit" data-request>Request this clean</button>
-<p class="quote-note" data-quote-note>Pay after the clean. Free re-clean within 48 hours.</p></div>
+<div class="est-result" aria-live="polite">
+<p class="small" data-est-label>{"One-time price" if preset == "postcon" else "Estimated monthly price"}</p>
+<p class="est-figure" data-est-figure>${figure:,}</p>
+<p data-est-detail>{detail}</p>
+<p class="small">An estimate before tax. We confirm the price after a 15-minute walkthrough.</p>
+<a class="btn btn-accent" data-est-cta href="#">Book a walkthrough</a>
+</div>
 </form>'''
 
 
-def quote_config(ctx):
-    return {"pricing": PRICING, "zips": ZIPS, "slots": OPEN_SLOTS, "sampleSlots": SAMPLE_SLOTS if ctx.preview else [],
-            "phone": B["phone_e164"], "phoneDisplay": B["phone_display"], "email": B["email"], "bookingUrl": B["booking_url"]}
+def faq_table(items, heading="Questions"):
+    rows = "".join(f'<div class="faq-row reveal"><h3 class="q">{E(q)}</h3><p class="a">{E(a)}</p></div>' for q, a in items)
+    return f'''<section class="section" id="faq"><div class="wrap faq-table">
+<div class="faq-row head"><h2 class="q">{E(heading)}</h2><span></span></div>{rows}</div></section>'''
 
 
-def config_script(ctx):
-    return f'<script>window.SUNNYMOP={json.dumps(quote_config(ctx))};</script>'
-
-
-def points_section(ctx, heading="Every clean, room by room"):
-    pts = [("Kitchen", "Counters, backsplash, sink and stovetop wiped and degreased."),
-           ("Appliances", "Fronts of the fridge, oven and dishwasher; inside the microwave."),
-           ("Bathrooms", "Showers, tubs, toilets, mirrors and glass scrubbed and disinfected."),
-           ("Floors", "Vacuumed and mopped, edges and corners included."),
-           ("Dusting", "Every reachable surface, ceiling fans, sills and switches."),
-           ("Beds", "Made with fresh linens when you leave them out."),
-           ("Lanai", "Furniture wiped and the floor swept."),
-           ("Trash", "Emptied everywhere, with fresh liners."),
-           ("Finish photos", "A few photos by text when we're done, if you're away.")]
-    lis = "".join(f'<li><strong><span class="dot" aria-hidden="true"></span>{E(t)}</strong><p>{E(d)}</p></li>' for t, d in pts)
-    return f'''<section class="section points-section" id="included"><div class="wrap">
-{ctx.img("pier_sea_grapes", "circle-photo points-photo")}
-<div><h2>{E(heading)}</h2><ul class="points">{lis}</ul></div>
+def contact_field(ctx):
+    user, dom = B["email"].split("@")
+    return f'''<section class="contact-field" id="contact"><div class="wrap">
+<p class="ask">Send us your square footage and how many nights a week. We'll reply with a price the same day.</p>
+<a class="mail-line" href="mailto:{B["email"]}?subject=Cleaning%20quote">{E(user)}@<wbr>{E(dom)}</a>
+<div class="contact-corners"><span><a href="tel:{B["phone_e164"]}" class="num">{E(B["phone_display"])}</a> · {E(B["city_line"])}</span>
+<span><a href="{ctx.href("walkthrough")}">Book a walkthrough</a> · <a href="{ctx.href("one-pager")}">Capability statement</a></span></div>
 </div></section>'''
-
-
-def pricing_tiles(ctx):
-    t = [("standard", "tile-1", "Standard", ["Kitchen, bathrooms and floors", "Dusting and beds", "Save up to 20% on a schedule"]),
-         ("deep", "tile-2", "Deep", ["Everything in standard", "Baseboards and door frames", "Cabinet fronts and grout", "Hard-water spots on glass"]),
-         ("moveout", "tile-3", "Move-in / move-out", ["Empty-home clean", "Inside cabinets and closets", "Inside fridge and oven", "Timed to your closing or lease", "Finish photos for the landlord"])]
-    tiles = "".join(f'''<article class="tile {cls}"><div class="tile-body"><h3>{name}</h3><p class="price">${price(k, 1, 1)}<small> and up</small></p>
-<ul>{"".join(f"<li>{E(x)}</li>" for x in lines)}</ul></div><a class="tile-strip" href="{ctx.href("book")}">Get my exact price <span aria-hidden="true">→</span></a></article>''' for k, cls, name, lines in t)
-    return f'''<section class="section" id="pricing"><div class="wrap">
-<div class="steps-grid"><div class="steps-head"><h2>Prices, upfront</h2><p class="lead">No phone call needed to find out what it costs.</p></div>{tiles}</div>
-<p class="under-tiles">Starting prices are for a 1-bedroom, 1-bathroom home. A 3-bedroom, 2-bathroom standard clean is ${price("standard", 3, 2)}, or ${price("standard", 3, 2, "biweekly")} every two weeks. Airbnb turnovers start at ${PRICING["minimum"]}. <a href="{ctx.href("pricing")}">See every price</a>.</p>
-</div></section>'''
-
-
-def flow_svgs():
-    # Many into one: scattered suns → a tight ribbon → neat rows. Drawn once, deterministic.
-    import random
-    rnd = random.Random(7)
-    h_dots, v_dots = [], []
-    for i in range(54):
-        x, y = 20 + rnd.random() * 380, 20 + rnd.random() * 220
-        h_dots.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{5 + rnd.random() * 3:.1f}" fill="{"#5c5a52" if i % 3 else "#8a8577"}"/>')
-        v_dots.append(f'<circle cx="{20 + rnd.random() * 200:.1f}" cy="{20 + rnd.random() * 260:.1f}" r="{4 + rnd.random() * 3:.1f}" fill="{"#5c5a52" if i % 3 else "#8a8577"}"/>')
-    for i in range(36):
-        cx, cy = 450 + (i % 18) * 16, 112 + (i // 18) * 16 + 8
-        h_dots.append(f'<circle cx="{cx}" cy="{cy}" r="6.5" fill="#d9b23a"/>')
-        v_dots.append(f'<circle cx="{104 + (i // 18) * 16}" cy="{330 + (i % 18) * 16}" r="6" fill="#d9b23a"/>')
-    for i in range(48):
-        cx, cy = 790 + (i % 12) * 30, 40 + (i // 12) * 56
-        h_dots.append(f'<circle cx="{cx}" cy="{cy}" r="10" fill="#ffc61a"/>')
-        v_dots.append(f'<circle cx="{24 + (i % 6) * 36}" cy="{680 + (i // 6) * 40}" r="11" fill="#ffc61a"/>')
-    h = f'<svg class="flow flow-h" viewBox="0 0 1160 260" role="img" aria-label="Scattered dots pulled into one tight line, then laid out in neat rows">{"".join(h_dots)}</svg>'
-    v = f'<svg class="flow flow-v" viewBox="0 0 240 1000" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Scattered dots pulled into one tight line, then laid out in neat rows">{"".join(v_dots)}</svg>'
-    return h, v
-
-
-def how_band(ctx):
-    h, v = flow_svgs()
-    return f'''<section class="night" id="how"><div class="wrap">
-<div class="night-head"><h2>Booked in a minute</h2><p class="lead">From a messy week to a clean home, with nothing to chase.</p></div>
-{h}
-<div class="flow-wrap">{v}
-<ol class="flow-steps">
-<li><h3>Book</h3><p>See your price and pick an opening online in about 60 seconds.</p></li>
-<li><h3>We clean</h3><p>Your cleaner works through a room-by-room checklist for your home.</p></li>
-<li><h3>You relax</h3><p>Pay after the clean. If anything's missed, we come back free within 48 hours.</p></li>
-</ol></div>
-</div></section>'''
-
-
-def areas_section(ctx):
-    frames = [("pier_sea_grapes", True), ("pier_walkers", False), ("pier_plaque", False)]
-    imgs = "".join(ctx.img(k, "on" if on else "", extra=f' data-caption="{E(PHOTOS[k]["caption"])}"') for k, on in frames)
-    links = "".join(f'<li><a href="{ctx.href("loc:" + l["slug"])}"><span class="dot" aria-hidden="true"></span>{E(l["name"])}</a></li>' for l in LOCATIONS)
-    zips = "".join(f"<li>{z}</li>" for z in ZIPS)
-    return f'''<section class="section areas-section" id="areas"><div class="wrap">
-<div class="frame"><button class="frame-stage" type="button" data-frame aria-label="Show the next Naples photo">{imgs}</button>
-<p class="frame-caption" data-frame-caption aria-live="polite">{E(PHOTOS["pier_sea_grapes"]["caption"])}</p></div>
-<div class="area-copy"><h2>Where we clean</h2><p class="lead">Every Naples neighborhood, from the pier to Collier Boulevard.</p>
-<ul class="area-list">{links}</ul>
-<h3>Naples zip codes</h3><ul class="zips">{zips}</ul></div>
-</div></section>'''
-
-
-def before_after(ctx, service=None):
-    items = [x for x in BEFORE_AFTER if service is None or x.get("service") == service]
-    if not items:
-        return ""
-    cards = "".join(f'''<figure class="ba" style="--split:50%"><img src="{ctx.asset("img/" + x["before"])}" alt="{E(x["alt"])}, before" loading="lazy">
-<img class="after" src="{ctx.asset("img/" + x["after"])}" alt="{E(x["alt"])}, after" loading="lazy">
-<input type="range" min="0" max="100" value="50" aria-label="Slide to compare before and after" oninput="this.parentNode.style.setProperty('--split', this.value + '%')"></figure>''' for x in items)
-    return f'<section class="section"><div class="wrap"><h2>Before and after</h2><p class="lead">Real SunnyMop jobs in Naples.</p><div class="ba-grid">{cards}</div></div></section>'
-
-
-def faq_block(items, heading="Questions, answered", aside=""):
-    tiles = "".join(f'<details name="faq"><summary>{E(q)}<span class="pm" aria-hidden="true"></span></summary><p>{E(a)}</p></details>' for q, a in items)
-    return f'''<section class="section faq-section" id="faq"><div class="wrap">
-<div class="faq-head"><h2>{E(heading)}</h2>{aside}</div><div class="faq">{tiles}</div>
-</div></section>'''
-
-
-def coupon(ctx):
-    svc = "".join(f'<option value="{s["name"]}">{E(s["name"])}</option>' for s in SERVICES)
-    return f'''<section class="section" id="offer"><div class="wrap">
-<div class="coupon">
-<div class="coupon-left">{ctx.img("surf", "coupon-photo")}<div class="stack"><h2>${B["first_clean_off"]} off your first clean</h2>
-<p>Send this and we'll text you back with your price and the next opening.</p></div></div>
-<form class="coupon-form" data-offer novalidate aria-label="Claim your first-clean offer">
-<label class="visually-hidden" for="o-name">Name</label><input id="o-name" name="name" autocomplete="name" placeholder="Your name" required>
-<label class="visually-hidden" for="o-phone">Mobile number</label><input id="o-phone" name="phone" type="tel" autocomplete="tel" placeholder="Mobile number" required>
-<label class="visually-hidden" for="o-zip">Zip code</label><input id="o-zip" name="zip" inputmode="numeric" maxlength="5" autocomplete="postal-code" placeholder="Zip code">
-<label class="visually-hidden" for="o-service">Service</label><select id="o-service" name="service">{svc}</select>
-<button class="btn btn-ink" type="submit">Claim ${B["first_clean_off"]} off</button><p class="form-msg" data-offer-msg role="status"></p>
-</form></div></div></section>'''
 
 
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
 def home(ctx, wrapper=True):
-    title = "House Cleaning Naples, FL | SunnyMop"
-    if PROOF["review_count"] and PROOF["rating"]:
-        title += f' | {PROOF["review_count"]}+ Five-Star Reviews'
-    desc = (f"Premium house cleaning in Naples, FL: standard, deep, move-out and Airbnb cleaning from ${price('standard', 1, 1)}. "
-            f"${B['first_clean_off']} off your first clean. Call or text {B['phone_display']}.")
-    svc_links = "".join(f'<li><a href="{ctx.href("svc:" + s["key"])}"><h3>{E(s["name"])}</h3><span class="from">from ${price(s["kind"], 1, 1, "biweekly" if s["key"] == "recurring" else "once")}</span><p>{E(s["short"])}</p></a></li>' for s in SERVICES)
-    body = f'''<section class="hero"><div class="hero-sun" aria-hidden="true"></div><div class="wrap">
-<div class="hero-copy"><h1>House cleaning in Naples, FL</h1>
-<p class="lead">Premium standard, deep, move-out and Airbnb cleaning. See your exact price now and pick the next opening.</p>
-<div class="hero-actions"><a class="btn btn-ink" href="#quote">See my price</a><a class="btn btn-plain" href="sms:{B["phone_e164"]}">Text {E(B["phone_display"])}</a></div>
-{promises()}</div>
-<div class="hero-quote" id="quote">{quote_widget(ctx)}</div>
+    hoods = [f'<a href="{ctx.href("area:" + a["slug"])}">{E(h)}</a>' for a in AREAS for h in a["hoods"][:3]]
+    names = ", ".join(hoods[:-1]) + " and " + hoods[-1]
+    proof = proof_lines()
+    clients = f' Clients include {E(", ".join(PROOF["clients"]))}.' if PROOF["clients"] else ""
+    proof_html = f'<ul class="list">{"".join(f"<li>{E(x)}</li>" for x in proof)}</ul>' if proof else ""
+    body = f'''<section class="hero">
+<div class="hero-media tint shutter">{ctx.img("bridge", lazy=False)}</div>
+<div class="wrap hero-inner">
+<h1>Medical offices, clean by morning</h1>
+<p class="horizon"><span class="h-left">Evening cleaning for medical, dental and office spaces</span><span class="h-right">in Brooklyn, Manhattan and Nassau County.</span></p>
+<div class="hero-cta"><a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a><a class="btn btn-line" href="#pricing">See prices</a></div>
 </div></section>
-{points_section(ctx)}
-{pricing_tiles(ctx)}
-{how_band(ctx)}
-<section class="section" id="services"><div class="wrap"><div class="services-head"><h2>Our services</h2><p class="lead">Five ways to get a clean Naples home.</p></div>
-<ul class="svc-list">{svc_links}</ul></div></section>
-{before_after(ctx)}
-{areas_section(ctx)}
-{faq_block(FAQ[:8], aside=f'<p><a href="{ctx.href("faq")}">All questions</a></p>')}
-{coupon(ctx)}'''
-    return page(ctx, "index", title, desc, config_script(ctx) + body, schema=[business_schema(), faq_schema(FAQ[:8])],
-                wrapper=wrapper, scripts=("site.js",))
+
+<section class="section" id="what"><div class="wrap reveal">
+<h2 class="visually-hidden">What we do</h2>
+<p class="picture-para">We arrive after your last patient leaves <span class="slot" aria-hidden="true">{ctx.img("windows")}</span>, disinfect every exam room and restroom, and lock up by midnight <span class="slot" aria-hidden="true">{ctx.img("rain")}</span>. You get photos before you open.</p>
+<div class="after-para"><p>One owner-operated crew, one written checklist, month-to-month contracts.{clients}</p>{proof_html}
+<a class="btn btn-accent" href="{ctx.href("svc:medical")}">What a medical clean includes</a></div>
+</div></section>
+
+<section class="verbs" aria-label="How it works">
+<div class="panel">{ctx.img("rain")}<div class="verb-track"><p class="verb">Lock up</p></div><p class="panel-note">You close at 6 and leave. We have the key, the alarm code and the checklist.</p></div>
+<div class="panel">{ctx.img("windows")}<div class="verb-track"><p class="verb">We clean</p></div><p class="panel-note">Exam rooms, restrooms, floors and trash, the same way every night. Photos when we finish.</p></div>
+<div class="panel">{ctx.img("morning")}<div class="verb-track"><p class="verb">Open up</p></div><p class="panel-note">Your team walks into a clean office. Billing is one monthly autopay, nothing to chase.</p></div>
+</section>
+
+<section class="price-section" id="pricing"><div class="wrap">
+<h2 class="price-sentence">From <span class="price-block num">${PRICING["min_visit"]}</span> a night</h2>
+<div class="price-row"><p>About ${PRICING["hourly"]} per cleaning hour, with supplies included. Monthly autopay, month to month, 30 days' notice to cancel.</p>
+<a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a></div>
+{estimator()}
+</div></section>
+
+<section class="wrap" id="areas" aria-label="Where we clean"><p class="names reveal" data-names><span class="lead-in">We clean in</span> {names}.</p></section>
+
+{faq_table(FAQ[:6])}
+{contact_field(ctx)}'''
+    return page(ctx, "index", "Medical & Office Cleaning NYC and Long Island | Clean by Morning",
+                f"Evening cleaning for medical, dental and office spaces in Brooklyn, Manhattan and Nassau County. From ${PRICING['min_visit']} a visit, month to month. Book a walkthrough.",
+                body, schema=[business_schema(), faq_schema(FAQ[:6])], wrapper=wrapper)
 
 
 def service_page(ctx, s):
     trail = [("index", "Home"), ("svc:" + s["key"], s["name"])]
-    inc = "".join(f'<li><span class="dot" aria-hidden="true"></span><span>{E(x)}</span></li>' for x in s["included"])
-    related = "".join(f'<li><a href="{ctx.href("svc:" + o["key"])}">{E(o["name"])}</a></li>' for o in SERVICES if o is not s)
-    near = "".join(f'<li><a href="{ctx.href("loc:" + l["slug"])}">{E(s["name"])} in {E(l["name"])}</a></li>' for l in LOCATIONS)
-    kind = s["kind"]
-    start = price(kind, 1, 1, "biweekly" if s["key"] == "recurring" else "once")
-    preset = "recurring" if s["key"] == "recurring" else kind
-    photo = {"standard": "palms", "deep": "pier_walkers", "moveout": "wide_beach", "airbnb": "surf", "recurring": "pier_sea_grapes"}[s["key"]]
-    schema = {"@context": "https://schema.org", "@type": "Service", "name": s["h1"], "serviceType": s["name"],
-              "provider": {"@id": B["domain"] + "/#business"}, "areaServed": {"@type": "City", "name": "Naples, FL"},
-              "offers": {"@type": "Offer", "priceCurrency": "USD", "price": str(start), "description": "Starting price, 1-bedroom 1-bathroom home"},
-              "url": ctx.canonical("svc:" + s["key"])}
-    body = f'''<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">{E(s["name"])}</li></ol></nav>
-<section class="page-hero"><div class="wrap"><div class="copy"><h1>{E(s["h1"])}</h1><p class="lead">{E(s["lead"])}</p>
-<div class="hero-actions"><a class="btn btn-sun" href="#quote">From ${start}: see my price</a><a class="btn btn-plain" href="sms:{B["phone_e164"]}">Text us</a></div>{promises()}</div>
-{ctx.img(photo, "circle-photo", lazy=False)}</div></section>
-<section class="section"><div class="wrap two-col">
-<div class="prose"><h2>What's included</h2><ul class="checklist">{inc}</ul>
-<h2>Who it's for</h2><p>{E(s["good_for"])}</p>
-<h2>Related services</h2><ul class="links-band">{related}</ul>
-<h2>{E(s["name"])} across Naples</h2><ul class="links-band">{near}</ul></div>
-<div class="sticky-quote" id="quote">{quote_widget(ctx, preset=preset, heading="Your price")}</div>
-</div></section>
-{before_after(ctx, s["slug"])}
-{faq_block(s["faq"], heading="Questions about " + s["name"].lower())}'''
-    return page(ctx, "svc:" + s["key"], f'{s["h1"]} | SunnyMop', f'{s["lead"][:120].rsplit(" ", 1)[0]}. From ${start}. Instant price online.',
-                config_script(ctx) + body, active="svc:standard", schema=[schema, crumbs_schema(ctx, trail), faq_schema(s["faq"])], scripts=("site.js",))
+    nightly = "".join(f"<li>{E(x)}</li>" for x in s["nightly"])
+    clinical = "".join(f"<li>{E(x)}</li>" for x in s["clinical"])
+    areas = "".join(f'<li><a href="{ctx.href("area:" + a["slug"])}">{E(s["name"])} in {E(a["name"])}</a></li>' for a in AREAS)
+    others = "".join(f'<li><a href="{ctx.href("svc:" + o["key"])}">{E(o["name"])}</a></li>' for o in SERVICES if o is not s)
+    if s["kind"] == "postcon":
+        start = postcon_price(1000)
+        price_line = f'From <span class="price-block num">${start}</span>, one time'
+        price_note = f"About ${PRICING['postcon_per_sqft']:.2f} per square foot, {int(PRICING['deposit'] * 100)}% deposit to book, the rest on completion."
+    else:
+        start = PRICING["min_visit"]
+        price_line = f'From <span class="price-block num">${start}</span> a night'
+        price_note = f"About ${PRICING['hourly']} per cleaning hour, supplies included, billed monthly by autopay."
+    schema = {"@context": "https://schema.org", "@type": "Service", "name": s["h1"], "serviceType": s["name"], "provider": {"@id": B["domain"] + "/#business"},
+              "areaServed": ["Brooklyn, NY", "Manhattan, NY", "Nassau County, NY"],
+              "offers": {"@type": "Offer", "priceCurrency": "USD", "price": str(start)}, "url": ctx.canonical("svc:" + s["key"])}
+    photo = {"medical": "windows", "dental": "morning", "office": "bridge", "gym": "rain", "postcon": "morning"}[s["key"]]
+    body = f'''{crumbs(ctx, s["name"])}
+{page_head(ctx, s["h1"], s["lead"], photo, ("Estimate the price", "#estimate"))}
+<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>Every visit</h2></div><div class="right5"><ul class="list">{nightly}</ul></div></div></section>
+{photo_row(ctx, [k for k in ("bridge", "rain", "windows", "morning") if k != photo], "After hours in New York: we start when you lock up.")}
+<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>How we work</h2></div><div class="right5"><ul class="list">{clinical}</ul></div></div></section>
+<section class="price-section" id="estimate" style="margin-top:clamp(120px,14vw,220px)"><div class="wrap">
+<h2 class="price-sentence">{price_line}</h2>
+<div class="price-row"><p>{price_note}</p><a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a></div>
+{estimator(s["kind"])}</div></section>
+{faq_table(s["faq"], "Questions about " + s["name"].lower())}
+<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>Where we do it</h2></div><div class="right5 stack"><ul class="link-row">{areas}</ul><ul class="link-row">{others}</ul></div></div></section>
+{contact_field(ctx)}'''
+    return page(ctx, "svc:" + s["key"], s["title"], s["lead"][:155], body, active="services",
+                schema=[schema, crumbs_schema(ctx, trail), faq_schema(s["faq"])])
 
 
-def location_page(ctx, l):
-    trail = [("index", "Home"), ("loc:" + l["slug"], l["name"])]
-    paras = "".join(f"<p>{E(p)}</p>" for p in l["body"])
-    links = "".join(f'<li><a href="{ctx.href("svc:" + s["key"])}">{E(s["name"])}</a></li>' for s in SERVICES)
-    others = "".join(f'<li><a href="{ctx.href("loc:" + o["slug"])}">{E(o["name"])}</a></li>' for o in LOCATIONS if o is not l)
-    zips = "".join(f"<li>{z}</li>" for z in l["zips"])
-    schema = business_schema() | {"areaServed": {"@type": "Place", "name": f'{l["name"]}, Naples, FL'}}
-    body = f'''<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">{E(l["name"])}</li></ol></nav>
-<section class="page-hero"><div class="wrap"><div class="copy"><h1>House cleaning in {E(l["name"])}</h1><p class="lead">{E(l["lead"])}</p>
-<div class="hero-actions"><a class="btn btn-sun" href="#quote">See my price</a><a class="btn btn-plain" href="sms:{B["phone_e164"]}">Text us</a></div></div>
-{ctx.img("pier_walkers" if l["slug"] == "old-naples" else ("wide_beach" if "beach" in l["slug"] or l["slug"] == "park-shore" else "palms"), "circle-photo", lazy=False)}</div></section>
-<section class="section"><div class="wrap two-col">
-<div class="prose"><h2>Cleaning in {E(l["name"])}</h2>{paras}
-<h2>Zip codes</h2><ul class="zips">{zips}</ul>
-<h2>Services in {E(l["name"])}</h2><ul class="links-band">{links}</ul>
-<h2>Nearby</h2><ul class="links-band">{others}</ul></div>
-<div class="sticky-quote" id="quote">{quote_widget(ctx)}</div>
-</div></section>'''
-    return page(ctx, "loc:" + l["slug"], f'House Cleaning {l["name"]}, Naples FL | SunnyMop', l["lead"][:155],
-                config_script(ctx) + body, active="index#areas", schema=[schema, crumbs_schema(ctx, trail)], scripts=("site.js",))
+def area_page(ctx, a):
+    trail = [("index", "Home"), ("area:" + a["slug"], a["name"])]
+    paras = "".join(f"<p>{E(p)}</p>" for p in a["body"])
+    svc = "".join(f'<li><a href="{ctx.href("svc:" + s["key"])}">{E(s["name"])}</a></li>' for s in SERVICES)
+    hoods = ", ".join(a["hoods"][:-1]) + " and " + a["hoods"][-1]
+    others = "".join(f'<li><a href="{ctx.href("area:" + o["slug"])}">{E(o["name"])}</a></li>' for o in AREAS if o is not a)
+    schema = business_schema() | {"areaServed": {"@type": "Place", "name": a["name"] + ", NY"}}
+    photo = "morning" if a["slug"] == "nassau-county" else ("bridge" if a["slug"] == "brooklyn" else "windows")
+    body = f'''{crumbs(ctx, a["name"])}
+{page_head(ctx, a["h1"], a["lead"], photo, ("See prices", ctx.href("pricing")))}
+<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>Cleaning in {E(a["name"])}</h2></div><div class="right5 stack">{paras}</div></div></section>
+<section class="wrap" aria-label="Neighborhoods"><p class="names reveal"><span class="lead-in">In {E(a["name"])} we clean in</span> {E(hoods)}.</p></section>
+<section class="section" style="padding-top:0"><div class="wrap grid reveal"><div class="left6"><h2>Services in {E(a["name"])}</h2></div><div class="right5 stack"><ul class="link-row">{svc}</ul><p>We also serve</p><ul class="link-row">{others}</ul></div></div></section>
+{photo_row(ctx, [k for k in ("bridge", "rain", "windows", "morning") if k != photo], "Evenings in New York, when we work.")}
+{contact_field(ctx)}'''
+    return page(ctx, "area:" + a["slug"], f'Office & Medical Cleaning {a["name"]}, NY | Clean by Morning', a["lead"][:155], body, active="areas",
+                schema=[schema, crumbs_schema(ctx, trail)])
 
 
 def pricing_page(ctx):
     trail = [("index", "Home"), ("pricing", "Pricing")]
-    sizes = [(1, 1), (2, 2), (3, 2), (4, 3), (5, 4)]
-    head = "".join(f"<th>{b} bed · {ba} bath</th>" for b, ba in sizes)
-    rows = [("Standard, one time", "standard", "once"), ("Standard, weekly", "standard", "weekly"), ("Standard, every 2 weeks", "standard", "biweekly"),
-            ("Standard, monthly", "standard", "monthly"), ("Deep", "deep", "once"), ("Move-in / move-out", "moveout", "once"), ("Airbnb turnover", "airbnb", "once")]
-    trs = "".join(f"<tr><th scope=\"row\">{E(n)}</th>" + "".join(f'<td class="n">${price(k, b, ba, f)}</td>' for b, ba in sizes) + "</tr>" for n, k, f in rows)
-    adds = "".join(f'<tr><th scope="row">{E(n)}</th><td class="n">${p}</td></tr>' for _, n, p in PRICING["addons"])
-    body = f'''<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">Pricing</li></ol></nav>
-<section class="page-hero"><div class="wrap"><div class="copy"><h1>House cleaning prices in Naples</h1>
-<p class="lead">Every price, by home size. Pay after the clean.</p></div>{ctx.img("pier_plaque", "circle-photo", lazy=False)}</div></section>
-<section class="section"><div class="wrap prose" style="max-width:none">
-<div class="table-scroll"><table><thead><tr><th>Service</th>{head}</tr></thead><tbody>{trs}</tbody></table></div>
-<h2>Add-ons</h2><div class="table-scroll" style="max-width:560px"><table><tbody>{adds}</tbody></table></div>
-<h2>Good to know</h2><ul class="checklist">
-<li><span class="dot"></span><span>Minimum ${PRICING["minimum"]} for any visit.</span></li>
-<li><span class="dot"></span><span>Recurring plans start with a deep clean, so every visit after holds that level.</span></li>
-<li><span class="dot"></span><span>Homes over 5 bedrooms or 4,000 square feet get a custom quote.</span></li>
-<li><span class="dot"></span><span>Not included: exterior windows, biohazards, mold or pest cleanup, and moving heavy furniture.</span></li>
-<li><span class="dot"></span><span>Move or cancel free with 48 hours' notice.</span></li></ul>
-<p><a class="btn btn-sun" href="{ctx.href("book")}">Get my exact price</a></p>
-</div></section>'''
-    return page(ctx, "pricing", "House Cleaning Prices Naples, FL | SunnyMop",
-                f"SunnyMop prices by home size: standard from ${price('standard', 1, 1)}, deep from ${price('deep', 1, 1)}, move-out from ${price('moveout', 1, 1)}. Recurring plans save up to 20%.",
+    sizes = [1000, 2000, 3500, 5000, 8000]
+    rows = []
+    for k, n in [("medical", "Medical, 3 nights a week"), ("dental", "Dental, 3 nights a week"), ("office", "Office, 3 nights a week"), ("gym", "Gym or studio, 5 nights a week")]:
+        nights = 5 if k == "gym" else 3
+        cells = "".join(f'<td class="n">${monthly_price(k, sz, 1 if sz < 2000 else 2 if sz < 5000 else 4, nights):,}</td>' for sz in sizes)
+        rows.append(f'<tr><th scope="row">{n}</th>{cells}</tr>')
+    rows.append('<tr><th scope="row">Post-construction, one time</th>' + "".join(f'<td class="n">${postcon_price(sz):,}</td>' for sz in sizes) + "</tr>")
+    head = "".join(f"<th>{sz:,} sq ft</th>" for sz in sizes)
+    body = f'''{crumbs(ctx, "Pricing")}
+{page_head(ctx, "Office cleaning prices", "Monthly prices for evening cleaning in Brooklyn, Manhattan and Nassau County, before tax. Billed once a month by autopay.", "rain", ("Estimate yours", "#estimate"))}
+<section class="section"><div class="wrap stack reveal"><h2>Prices by size</h2>
+<div class="table-scroll"><table class="price-table"><thead><tr><th>Space and schedule</th>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>
+<p class="note">Monthly figures assume {PRICING["weeks_per_month"]} weeks a month and 1–4 restrooms by size. New York sales tax applies to commercial cleaning. Your exact price comes after a 15-minute walkthrough.</p>
+</div></section>
+{photo_row(ctx, ["bridge", "windows", "morning"], "Priced by the hour of cleaning, not by guesswork.")}
+<section class="price-section" id="estimate" style="margin-top:clamp(120px,14vw,220px)"><div class="wrap">
+<h2 class="price-sentence">Your price, in a minute</h2>{estimator()}</div></section>
+<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>How billing works</h2></div><div class="right5"><ul class="list">
+<li>One monthly price, billed on the 1st by ACH autopay</li><li>First month paid before the first clean</li><li>Month to month; 30 days' notice to cancel</li>
+<li>One-time jobs: {int(PRICING["deposit"] * 100)}% deposit to book, the rest on completion</li><li>Restroom paper, soap and liners restocked at cost if you want</li></ul></div></div></section>
+{contact_field(ctx)}'''
+    return page(ctx, "pricing", "Office Cleaning Prices NYC & Long Island | Clean by Morning",
+                f"Monthly prices for medical, dental, office and gym cleaning in Brooklyn, Manhattan and Nassau County. From ${PRICING['min_visit']} a visit.",
                 body, active="pricing", schema=[crumbs_schema(ctx, trail)])
+
+
+def walkthrough_page(ctx):
+    trail = [("index", "Home"), ("walkthrough", "Book a walkthrough")]
+    opts = "".join(f"<option>{E(s['name'])}</option>" for s in SERVICES)
+    body = f'''{crumbs(ctx, "Book a walkthrough")}
+<section class="section" style="padding-top:clamp(48px,6vw,96px)"><div class="wrap grid">
+<div class="left6 stack reveal"><h1 style="font-size:var(--step-head)">Book a 15-minute walkthrough</h1><p class="statement">We look at the space, agree on the checklist and send a fixed monthly price the same day.</p>
+<ul class="list"><li>Free, with no obligation</li><li>Before or after your hours, whichever suits you</li><li>Price in writing within 24 hours</li><li>Most clients start within a week</li></ul>
+<p>Rather talk? Call <a href="tel:{B["phone_e164"]}" class="num">{E(B["phone_display"])}</a>.</p></div>
+<form class="form right5" data-walkthrough novalidate aria-label="Walkthrough request">
+<div class="field"><label for="w-name">Your name</label><input id="w-name" name="name" type="text" autocomplete="name" required></div>
+<div class="field"><label for="w-company">Practice or company</label><input id="w-company" name="company" type="text" autocomplete="organization"></div>
+<div class="field"><label for="w-email">Email</label><input id="w-email" name="email" type="email" autocomplete="email" required></div>
+<div class="field"><label for="w-phone">Phone</label><input id="w-phone" name="phone" type="tel" autocomplete="tel"></div>
+<div class="field"><label for="w-type">Type of space</label><select id="w-type" name="type">{opts}</select></div>
+<div class="field"><label for="w-address">Address or neighborhood</label><input id="w-address" name="address" type="text" autocomplete="street-address"></div>
+<div class="field"><label for="w-sqft">Approximate square feet</label><input id="w-sqft" name="sqft" type="text" inputmode="numeric"></div>
+<div class="field"><label for="w-notes">Nights a week, and anything else</label><textarea id="w-notes" name="notes"></textarea></div>
+<button class="btn" type="submit">Request a walkthrough</button><p class="form-msg" data-form-msg role="status"></p>
+</form></div></section>'''
+    return page(ctx, "walkthrough", "Book a Cleaning Walkthrough | Clean by Morning",
+                "Book a free 15-minute walkthrough for medical, dental or office cleaning in Brooklyn, Manhattan or Nassau County. Price in writing within 24 hours.",
+                body, schema=[crumbs_schema(ctx, trail)])
 
 
 def faq_page(ctx):
     trail = [("index", "Home"), ("faq", "FAQ")]
-    body = f'''<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">FAQ</li></ol></nav>
-{faq_block(FAQ, heading="House cleaning questions")}
-{coupon(ctx)}'''
-    return page(ctx, "faq", "House Cleaning FAQ | SunnyMop Naples, FL",
-                "Answers about SunnyMop house cleaning in Naples: prices, access while you're away, supplies, guarantee, payment and cancellations.",
-                config_script(ctx) + body, active="faq", schema=[faq_schema(FAQ), crumbs_schema(ctx, trail)], scripts=("site.js",))
+    body = f'''{crumbs(ctx, "FAQ")}
+{page_head(ctx, "Commercial cleaning questions", "Prices, schedules, keys and alarms, payment and contracts: the questions office managers ask before they sign.", "morning")}
+{faq_table(FAQ, "Questions")}
+{photo_row(ctx, ["bridge", "rain", "windows"], "After hours in New York, when we work.")}
+{contact_field(ctx)}'''
+    return page(ctx, "faq", "Commercial Cleaning FAQ | Clean by Morning",
+                "Answers about Clean by Morning's evening office and medical cleaning: prices, schedules, keys and alarms, payment and contracts.",
+                body, schema=[faq_schema(FAQ), crumbs_schema(ctx, trail)])
 
 
 def about_page(ctx):
     trail = [("index", "Home"), ("about", "About")]
-    body = f'''<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">About</li></ol></nav>
-<section class="page-hero"><div class="wrap"><div class="copy"><h1>A cleaner way to book</h1>
-<p class="lead">SunnyMop is a new Naples house cleaning company built to be easy to trust.</p></div>{ctx.img("palms", "circle-photo", lazy=False)}</div></section>
-<section class="section"><div class="wrap prose">
-<p>Hiring a cleaner shouldn't feel like a gamble. So we show every price upfront, we charge only after the clean, and if something's missed we come back free within 48 hours.</p>
-<p>Every visit follows a written, room-by-room checklist, so the clean you get on your tenth visit matches the first. You can ask for the same cleaner every time, and if you're away, we text finish photos.</p>
-<p>We clean homes, condos and vacation rentals across Naples, from Old Naples to East Naples.</p>
-<p><a class="btn btn-sun" href="{ctx.href("book")}">Get my price</a></p>
+    body = f'''{crumbs(ctx, "About")}
+{page_head(ctx, "One crew, one checklist", "Clean by Morning is an owner-operated cleaning company for medical practices and small offices in New York City and Nassau County.", "windows")}
+{photo_row(ctx, ["bridge", "rain", "morning"], "From lock-up to opening: the hours we work.")}
+<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>Why we work this way</h2></div><div class="right5 stack">
+<p>Office managers tell us the same story: a different cleaner every month, a checklist nobody follows, and an invoice that keeps changing. We built Clean by Morning to fix that.</p>
+<p>The owner cleans or inspects every account. Every visit follows the same written checklist. Prices are fixed and billed once a month, and you can leave with 30 days' notice.</p>
+<p>We clean in the evening, after you close, so your patients and staff never see us, only the result.</p></div></div></section>
+{contact_field(ctx)}'''
+    return page(ctx, "about", "About Clean by Morning | NYC Office Cleaning",
+                "Clean by Morning is an owner-operated evening cleaning company for medical practices and small offices in NYC and Nassau County.",
+                body, schema=[crumbs_schema(ctx, trail)])
+
+
+def one_pager(ctx):
+    proof = proof_lines() or ["Certificate of insurance sent on request once coverage is in place"]
+    sub = 'style="font-size:var(--step-statement)"'
+    body = f'''<section class="section" style="padding-top:48px"><div class="wrap stack">
+<h1 style="font-size:var(--step-head)">Capability statement</h1>
+<div class="grid"><div class="left6 stack">
+<p class="statement">{E(B["legal_name"])}: evening commercial cleaning for medical offices, dental practices, offices and gyms in Brooklyn, Manhattan and Nassau County.</p>
+<h2 {sub}>Services</h2><ul class="list">{"".join(f"<li>{E(s['name'])}</li>" for s in SERVICES)}</ul>
+<h2 {sub}>How we work</h2><ul class="list"><li>Owner-operated; the owner cleans or inspects every account</li><li>Written checklist per site; photos after each visit on request</li>
+<li>Color-coded microfiber and EPA-registered disinfectants</li><li>No handling of sharps or regulated medical waste</li><li>Keys and alarm codes stored securely</li></ul></div>
+<div class="right5 stack"><h2 {sub}>Commercial terms</h2><ul class="list"><li>Fixed monthly price, ACH autopay on the 1st</li><li>Month to month, 30 days' notice</li>
+<li>From ${PRICING["min_visit"]} per visit; about ${PRICING["hourly"]} per cleaning hour</li><li>NAICS 561720, Janitorial Services</li>{"".join(f"<li>{E(x)}</li>" for x in proof)}</ul>
+<h2 {sub}>Contact</h2><p>{E(B["email"])}<br><span class="num">{E(B["phone_display"])}</span><br>{E(B["domain"].replace("https://", ""))}</p></div></div>
 </div></section>'''
-    return page(ctx, "about", "About SunnyMop | House Cleaning in Naples, FL",
-                "SunnyMop is a Naples house cleaning company: prices upfront, pay after the clean, and a free re-clean within 48 hours.",
-                body, active=None, schema=[crumbs_schema(ctx, trail)])
+    return page(ctx, "one-pager", "Clean by Morning Capability Statement", "Capability statement for Clean by Morning Office Cleaning.", body, noindex=True)
 
 
-def book_page(ctx):
-    trail = [("index", "Home"), ("book", "Book")]
-    body = f'''<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">Book</li></ol></nav>
-<section class="section" style="padding-top:48px"><div class="wrap two-col">
-<div class="prose"><h1 style="font-size:clamp(2.6rem,1.4rem + 4.6vw,5.6rem)">Get your price</h1>
-<p class="lead">Pick the clean, your home size and an opening. We confirm by text.</p>
-<ul class="checklist"><li><span class="dot"></span><span>Pay after the clean, never before</span></li>
-<li><span class="dot"></span><span>Free re-clean within 48 hours</span></li><li><span class="dot"></span><span>Move or cancel free with 48 hours' notice</span></li></ul>
-<p>Prefer to talk? Call or text <strong class="num">{E(B["phone_display"])}</strong>, {E(B["hours"])}.</p></div>
-<div id="quote">{quote_widget(ctx)}</div></div></section>'''
-    return page(ctx, "book", "Book House Cleaning in Naples, FL | SunnyMop",
-                "See your exact house cleaning price for your Naples home and request the next opening in about a minute.",
-                config_script(ctx) + body, active=None, schema=[crumbs_schema(ctx, trail)], scripts=("site.js",))
-
-
-def contact_page(ctx):
-    trail = [("index", "Home"), ("contact", "Contact")]
-    body = f'''<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">Contact</li></ol></nav>
-<section class="page-hero"><div class="wrap"><div class="copy"><h1>Talk to SunnyMop</h1>
-<p class="lead">Call or text <span class="num">{E(B["phone_display"])}</span>. Email {E(B["email"])}. {E(B["hours"])}.</p>
-<div class="hero-actions"><a class="btn btn-sun" href="sms:{B["phone_e164"]}">Text us</a><a class="btn btn-plain" href="tel:{B["phone_e164"]}">Call us</a></div></div>
-{ctx.img("wide_beach", "circle-photo", lazy=False)}</div></section>
-{coupon(ctx)}'''
-    return page(ctx, "contact", "Contact SunnyMop | House Cleaning Naples, FL",
-                f"Call or text SunnyMop at {B['phone_display']} for house cleaning in Naples, FL. {B['hours']}.",
-                config_script(ctx) + body, active="contact", schema=[business_schema(), crumbs_schema(ctx, trail)], scripts=("site.js",))
-
-
-def not_found(ctx):
-    body = f'''<section class="section"><div class="wrap prose"><h1 style="font-size:var(--step-head)">Page not found</h1>
-<p class="lead">That page doesn't exist.</p><p><a class="btn btn-sun" href="{ctx.href("book")}">Get my price</a></p></div></section>'''
-    return page(ctx, "404", "Page not found | SunnyMop", "Page not found.", body, noindex=True)
-
-
-# ---------------------------------------------------------------------------
-# Brand kit and checklist
-# ---------------------------------------------------------------------------
-BRAND = {
-    "idea": "The sun in the name is the brand's only shape. It's the 'o' in the wordmark, every button, every photo frame and every list mark.",
-    "positioning": "SunnyMop is premium house cleaning in Naples that's easy to trust: every price upfront, payment after the clean, and a free re-clean within 48 hours.",
-    "words_yes": ["Judgement-free", "Guaranteed", "Trustworthy", "Ready when you are"],
-    "words_no": ["Cheap", "Scammy", "Low quality", "Untrustworthy"],
-    "taglines": ["Your satisfaction is the job.", "A cleaner home, guaranteed.", "Sunny side up, every room."],
-    "colors": [("Sun", "#FFC61A", "Logo 'o', main buttons, the hero sun, open FAQ"), ("Ink", "#0B0B0B", "Text, dark band, secondary buttons"),
-               ("Paper", "#F7F7F5", "Page background"), ("Stone", "#EBEBE8", "Form fields, quiet surfaces, footer"),
-               ("Palm", "#BDF29D", "Pricing tile"), ("Gulf", "#93ECE9", "Pricing tile"), ("Sky", "#A9B8F7", "Pricing tile")],
-    "type": "Schibsted Grotesk (Google Fonts): 800 for headlines with tight tracking (-0.05em), 400 for text, 600 for labels and buttons.",
-}
-
-
-def brand_kit_page(ctx):
-    sw = "".join(f'<li style="display:grid;gap:8px"><span style="display:block;width:112px;aspect-ratio:1;border-radius:50%;background:{c}"></span><strong>{E(n)}</strong><span class="num">{c}</span><span class="small">{E(u)}</span></li>' for n, c, u in BRAND["colors"])
-    body = f'''<section class="section" style="padding-top:56px"><div class="wrap prose" style="max-width:none">
-<h1 style="font-size:var(--step-head)">SunnyMop brand kit</h1><p class="lead">{E(BRAND["positioning"])}</p>
-<p class="big-mark" aria-label="SunnyMop wordmark" style="font-size:clamp(4rem,2rem + 10vw,11rem)">sunnym<span class="sun-o"></span>p</p>
-<p>{E(BRAND["idea"])}</p>
-<h2>Colors</h2><ul style="list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:28px">{sw}</ul>
-<h2>Type</h2><p>{E(BRAND["type"])}</p>
-<h2>Taglines</h2><ul class="checklist">{"".join(f'<li><span class="dot"></span><span>{E(t)}</span></li>' for t in BRAND["taglines"])}</ul>
-<h2>Feel</h2><p>Always: {E(", ".join(BRAND["words_yes"]))}. Never: {E(", ".join(BRAND["words_no"]))}.</p>
-<h2>Photos to shoot (your own jobs)</h2><ul class="checklist">
-<li><span class="dot"></span><span>Stovetops and ovens before and after: the highest-impact shot</span></li>
-<li><span class="dot"></span><span>Baseboards, grout and shower glass close-ups</span></li>
-<li><span class="dot"></span><span>Bathroom vanities and fridges, same angle and light before and after</span></li>
-<li><span class="dot"></span><span>Landscape orientation, nothing that identifies the client's home</span></li></ul>
-</div></section>'''
-    return page(ctx, "brand-kit", "SunnyMop Brand Kit", "Logo, colors, type and voice for SunnyMop.", body, noindex=True)
-
-
-CHECKLIST = [
-    ("Before launch", ["Check 'SunnyMop' on Sunbiz and the USPTO trademark search; register the name or a fictitious name",
-                       "Buy the domain and set it in site/build.py",
-                       "Set your real phone, email and first-clean offer in site/build.py",
-                       "Bind insurance, then set insured: True. Do the same for bonded and background checks",
-                       "Add real openings to OPEN_SLOTS, or a booking link to booking_url",
-                       "Deploy site/public to Cloudflare Pages and connect the domain"]),
-    ("Photos", ["Shoot your first 5 before-and-after pairs (ovens and stovetops first)",
-                "Save them as WebP with names like deep-cleaning-oven-before-naples.webp and list them in BEFORE_AFTER",
-                "Replace the beach stock photos with your own Naples shots over time"]),
-    ("Google", ["Create and verify your Google Business Profile as a service-area business in Naples",
-                "Submit sitemap.xml in Google Search Console",
-                "Add your GA4 id to ga4_id in site/build.py",
-                "Ask every client for a review; set review_count and rating once you have them"]),
-    ("Listings (same name and phone everywhere)", ["Yelp", "Nextdoor", "Facebook", "Angi", "Thumbtack", "BBB", "Apple Business Connect", "Bing Places"]),
-    ("Content", ["Blog: How much does house cleaning cost in Naples? (2026 guide)", "Blog: Move-out cleaning checklist for Florida rentals",
-                 "Blog: Deep cleaning vs. regular cleaning", "Blog: Hurricane-season cleanup and prep"]),
+GUIDES = [
+    {"slug": "office-cleaning-cost-nyc", "title": "How much does office cleaning cost in NYC?",
+     "meta": "What office and medical cleaning costs in Brooklyn, Manhattan and Nassau County, what changes the price, and worked examples by size.",
+     "lead": "Most commercial cleaning in New York is priced by the hours it takes, multiplied by how many nights a week you need it. Here's how that works, with our own prices as examples.",
+     "sections": [
+         ("What sets the price", ["Square footage: a routine office cleans at roughly 2,000–3,000 square feet an hour; medical and dental spaces take longer because every room is disinfected.",
+                                  "Nights a week: most offices book two to five; gyms often book five to seven.",
+                                  "Restrooms: each one adds time every visit.",
+                                  "Building rules: Manhattan buildings often limit service hours and require a certificate of insurance, which can affect scheduling."]),
+         ("Worked examples (Clean by Morning prices)", [f"1,000 sq ft office, 3 nights a week: about ${monthly_price('office', 1000, 1, 3):,} a month",
+                                                       f"2,000 sq ft medical office, 3 nights a week: about ${monthly_price('medical', 2000, 2, 3):,} a month",
+                                                       f"3,500 sq ft dental office, 5 nights a week: about ${monthly_price('dental', 3500, 2, 5):,} a month",
+                                                       f"5,000 sq ft office, 3 nights a week: about ${monthly_price('office', 5000, 4, 3):,} a month"]),
+         ("Sales tax", ["Commercial cleaning is generally subject to New York sales tax. The rate depends on where the work is done: 8.875% in New York City and 8.625% in Nassau County. Ask any cleaner whether their quote includes it."]),
+         ("Questions to ask any cleaning company", ["Is the price fixed monthly, or does it change with hours?", "Is there a contract term, and how much notice do I need to cancel?",
+                                                   "Can you send a certificate of insurance before you start?", "Who will clean my office, and will it be the same person each night?"]),
+     ]},
+    {"slug": "medical-office-cleaning-checklist", "title": "Medical office cleaning checklist",
+     "meta": "A nightly, weekly and monthly cleaning checklist for medical practices, and what a cleaning company should never handle.",
+     "lead": "A written checklist is what makes a medical office clean the same way every night. This is the list we work from, which you can adapt for your own practice.",
+     "sections": [
+         ("Every night", ["Exam rooms: counters, chairs, exam table surfaces outside the paper, door handles and light switches disinfected",
+                          "Waiting room: chairs, front desk, pens, clipboards and door handles", "Restrooms: toilets, sinks, mirrors, dispensers; paper and soap restocked",
+                          "Trash and recycling emptied; liners replaced", "Hard floors damp-mopped, carpets vacuumed"]),
+         ("Every week", ["Baseboards and vents dusted", "Inside microwaves and break-room fridge fronts", "Chair legs and bases wiped", "Glass partitions and entry doors"]),
+         ("Every month", ["High dusting: light fixtures, tops of cabinets", "Upholstered waiting-room chairs vacuumed", "Floor machine scrub or carpet spot treatment as needed"]),
+         ("How it should be done", ["Color-coded microfiber, so restroom cloths never touch exam rooms", "EPA-registered disinfectants, left wet for the contact time on the label",
+                                    "Work from clean areas to dirty areas, and high surfaces to low"]),
+         ("What a cleaner should never handle", ["Sharps containers and regulated medical waste: these go with your licensed medical waste hauler",
+                                                 "Patient files, screens and anything in drawers"]),
+     ]},
+    {"slug": "dental-office-cleaning-frequency", "title": "How often should a dental office be cleaned?",
+     "meta": "How many nights a week dental practices usually book cleaning, what gets cleaned each visit, and what stays with the clinical team.",
+     "lead": "Most dental practices book cleaning three to five nights a week. The right number depends on patient volume and how many operatories you run.",
+     "sections": [
+         ("A rule of thumb", ["Open four or five days with full schedules: clean every night you're open", "Open three days or fewer: clean the nights after you see patients",
+                              "Restrooms and reception: every visit, whatever the schedule"]),
+         ("What the cleaning crew does", ["Operatory floors, counters outside the clinical zone, door handles and switches", "Sterilization-area floors and sinks",
+                                          "Reception, restrooms, break room and trash"]),
+         ("What stays with your clinical team", ["Chairside surfaces and equipment between patients", "Sharps, amalgam and regulated waste, through your licensed hauler"]),
+         ("Pricing it", [f"A 2,000 sq ft practice cleaned four nights a week is about ${monthly_price('dental', 2000, 2, 4):,} a month at our rates.",
+                         "The estimator on our pricing page shows other sizes and schedules."]),
+     ]},
 ]
 
 
-def checklist_page(ctx):
-    n = 0
-    secs = []
-    for t, items in CHECKLIST:
-        lis = []
-        for it in items:
-            n += 1
-            lis.append(f'<li><span class="dot"></span><label for="c{n}"><input type="checkbox" id="c{n}"> {E(it)}</label></li>')
-        secs.append(f'<h2>{E(t)}</h2><ul class="checklist">{"".join(lis)}</ul>')
-    body = f'''<section class="section" style="padding-top:56px"><div class="wrap prose"><h1 style="font-size:var(--step-head)">SunnyMop launch checklist</h1>{"".join(secs)}</div></section>'''
-    return page(ctx, "checklist", "SunnyMop Launch Checklist", "Launch checklist for SunnyMop.", body, noindex=True)
+def guide_page(ctx, g):
+    key = "guides/" + g["slug"]
+    trail = [("index", "Home"), ("guides", "Guides"), (key, g["title"])]
+    secs = "".join(f'<h2>{E(h)}</h2><ul>{"".join(f"<li>{E(x)}</li>" for x in items)}</ul>' for h, items in g["sections"])
+    schema = {"@context": "https://schema.org", "@type": "Article", "headline": g["title"], "description": g["meta"],
+              "author": {"@type": "Organization", "name": B["name"]}, "publisher": {"@id": B["domain"] + "/#business"},
+              "mainEntityOfPage": ctx.canonical(key), "image": B["domain"] + "/img/" + PHOTOS["windows"]["file"]}
+    body = f'''{crumbs(ctx, "Guides")}
+{page_head(ctx, g["title"], g["lead"], "windows", ("See prices", ctx.href("pricing")))}
+<section class="section"><div class="wrap"><article class="article reveal">{secs}
+<p>Want this checklist for your own office, priced? <a class="text-link" href="{ctx.href("walkthrough")}">Book a 15-minute walkthrough</a>.</p></article></div></section>
+{photo_row(ctx, ["bridge", "rain", "morning"], "After hours in New York, when we work.")}
+{contact_field(ctx)}'''
+    return page(ctx, key, f'{g["title"]} | Clean by Morning', g["meta"], body, schema=[schema, crumbs_schema(ctx, trail)])
 
 
-def brand_md():
-    out = ["# SunnyMop brand kit", "", "Generated by `site/build.py`.", "", BRAND["positioning"], "", "## Idea", "", BRAND["idea"], "",
-           "## Wordmark", "", "Lowercase `sunnymop` in Schibsted Grotesk 800, tracking -0.06em, with the `o` replaced by a filled Sun circle. "
-           "`brand/wordmark.svg` uses live text; outline it in Figma or Canva before sending to a printer.", "", "## Colors", "", "| Name | Hex | Use |", "| --- | --- | --- |"]
-    out += [f"| {n} | `{c}` | {u} |" for n, c, u in BRAND["colors"]]
-    out += ["", "## Type", "", BRAND["type"], "", "## Taglines", ""] + [f"- {t}" for t in BRAND["taglines"]]
-    out += ["", "## Feel", "", "Always: " + ", ".join(BRAND["words_yes"]) + ". Never: " + ", ".join(BRAND["words_no"]) + ".", ""]
-    return "\n".join(out)
+def guides_index(ctx):
+    trail = [("index", "Home"), ("guides", "Guides")]
+    items = "".join(f'<li><a href="{ctx.href("guides/" + g["slug"])}">{E(g["title"])}</a><p>{E(g["meta"])}</p></li>' for g in GUIDES)
+    body = f'''{crumbs(ctx, "Guides")}
+{page_head(ctx, "Guides for office managers", "Plain answers about commercial cleaning in New York: what it costs, what it should include, and how often you need it.", "morning")}
+<section class="section"><div class="wrap"><ul class="guide-list reveal">{items}</ul></div></section>
+{photo_row(ctx, ["bridge", "rain", "windows"], "After hours in New York, when we work.")}
+{contact_field(ctx)}'''
+    return page(ctx, "guides", "Commercial Cleaning Guides | Clean by Morning",
+                "Guides for NYC and Long Island office managers: cleaning costs, medical office checklists and how often to clean a dental office.",
+                body, schema=[crumbs_schema(ctx, trail)])
 
 
-def checklist_md():
-    out = ["# SunnyMop launch checklist", "", "Generated by `site/build.py`.", ""]
-    for t, items in CHECKLIST:
-        out += [f"## {t}", ""] + [f"- [ ] {i}" for i in items] + [""]
-    return "\n".join(out)
+def not_found(ctx):
+    body = f'''<section class="wrap page-head"><h1>Page not found</h1><p class="statement">That page doesn't exist.</p>
+<div class="hero-cta" style="justify-content:flex-start"><a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a></div></section>'''
+    return page(ctx, "404", "Page not found | Clean by Morning", "Page not found.", body, noindex=True)
 
 
-WORDMARK_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" width="520" height="120">
-<text x="0" y="92" font-family="'Schibsted Grotesk', Arial, sans-serif" font-weight="800" font-size="112" letter-spacing="-6.7" fill="#0b0b0b">sunnym</text>
-<circle cx="412" cy="70" r="31" fill="#ffc61a"/>
-<text x="446" y="92" font-family="'Schibsted Grotesk', Arial, sans-serif" font-weight="800" font-size="112" letter-spacing="-6.7" fill="#0b0b0b">p</text>
-</svg>
-'''
-FAVICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#ffc61a"/></svg>\n'
+FAVICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0034eb"/><rect x="14" y="40" width="36" height="10" fill="#e9e34a"/></svg>\n'
 
 
-# ---------------------------------------------------------------------------
-# Build
-# ---------------------------------------------------------------------------
 def all_pages(ctx):
-    pages = {"index": home(ctx), "pricing": pricing_page(ctx), "faq": faq_page(ctx), "about": about_page(ctx),
-             "book": book_page(ctx), "contact": contact_page(ctx), "404": not_found(ctx)}
+    pages = {"index": home(ctx), "pricing": pricing_page(ctx), "walkthrough": walkthrough_page(ctx), "faq": faq_page(ctx),
+             "about": about_page(ctx), "one-pager": one_pager(ctx), "guides": guides_index(ctx), "404": not_found(ctx)}
+    for g in GUIDES:
+        pages["guides/" + g["slug"]] = guide_page(ctx, g)
     for s in SERVICES:
         pages["svc:" + s["key"]] = service_page(ctx, s)
-    for l in LOCATIONS:
-        pages["loc:" + l["slug"]] = location_page(ctx, l)
+    for a in AREAS:
+        pages["area:" + a["slug"]] = area_page(ctx, a)
     return pages
 
 
@@ -819,9 +716,10 @@ def write(p, text):
 
 
 def copy_static(dest):
-    shutil.copy(ROOT / "static" / "styles.css", dest / "styles.css")
-    shutil.copy(ROOT / "static" / "site.js", dest / "site.js")
+    for f in ("styles.css", "site.js"):
+        shutil.copy(ROOT / "static" / f, dest / f)
     shutil.copytree(ROOT / "static" / "img", dest / "img", dirs_exist_ok=True)
+    shutil.copytree(ROOT / "static" / "fonts", dest / "fonts", dirs_exist_ok=True)
     write(dest / "favicon.svg", FAVICON)
 
 
@@ -832,7 +730,7 @@ def build():
     pages = all_pages(ctx)
     for k, t in pages.items():
         write(out / live_file(k), t)
-    urls = "".join(f"<url><loc>{ctx.canonical(k)}</loc></url>" for k in pages if k != "404")
+    urls = "".join(f"<url><loc>{ctx.canonical(k)}</loc></url>" for k in pages if k not in ("404", "one-pager"))
     write(out / "sitemap.xml", f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>\n')
     write(out / "robots.txt", f"User-agent: *\nAllow: /\n\nSitemap: {B['domain']}/sitemap.xml\n")
     copy_static(out)
@@ -841,18 +739,11 @@ def build():
     shutil.rmtree(prev, ignore_errors=True)
     pctx = Ctx(True)
     pp = all_pages(pctx)
-    pp["brand-kit"] = brand_kit_page(pctx)
-    pp["checklist"] = checklist_page(pctx)
     for k, t in pp.items():
         write(prev / preview_file(k), t)
-    entry = home(pctx, wrapper=False).replace("<title>House Cleaning Naples, FL | SunnyMop</title>", "<title>SunnyMop Website</title>", 1)
+    entry = home(pctx, wrapper=False).replace("<title>Medical &amp; Office Cleaning NYC and Long Island | Clean by Morning</title>", "<title>Clean by Morning Website</title>", 1)
     write(prev / "index.html", entry)
     copy_static(prev)
-
-    write(REPO / "brand" / "BRAND.md", brand_md())
-    write(REPO / "brand" / "wordmark.svg", WORDMARK_SVG)
-    write(REPO / "brand" / "sun-mark.svg", FAVICON)
-    write(REPO / "docs" / "launch-checklist.md", checklist_md())
     print(f"Built {len(pages)} live pages, {len(pp) + 1} preview pages.")
 
 

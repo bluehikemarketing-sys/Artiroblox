@@ -1,53 +1,45 @@
-# SunnyMop website
+# Clean by Morning website
 
-The website for SunnyMop, a house cleaning company in Naples, FL. It's a static site with no dependencies: `build.py` generates every page from one file.
+The website for Clean by Morning, evening commercial cleaning in Brooklyn, Manhattan and Nassau County. It's a static site with no dependencies: `build.py` generates every page.
 
 ## Edit and build
 
 1. Open `site/build.py` and fill in the settings at the top:
-   - `B`: domain, phone, email, booking link, Google Analytics id and first-clean offer. Everything marked `PLACEHOLDER` must be replaced.
-   - `PROOF`: insurance, bond, background checks and Google reviews. A badge or rating only appears once its setting is true or filled in.
-   - `BEFORE_AFTER`: your own before-and-after photo pairs. The gallery stays hidden until you add one.
-   - `OPEN_SLOTS`: openings you can really take. Past ones hide automatically.
-   - `PRICING`: one formula used everywhere: the quote tool, the price tiles, the pricing table and the schema.
+   - `B`: phone, email, form service URL (`form_endpoint`, e.g. Formspree), Google Analytics id, profile links (`same_as`). Everything marked `PLACEHOLDER` must be replaced.
+   - `PROOF`: insurance, bond, workers' comp, Google reviews, client names. Each only appears on the site once it's true.
+   - `PRICING`: hourly rate, minimum per visit, cleaning speed by space type, post-construction rate. One model drives the estimator, the price lines, the pricing table and the guides.
 2. Run `python3 site/build.py`.
 
-The build writes:
-
-| Output | What it is |
-| --- | --- |
-| `site/public/` | The live website; this is the folder you deploy |
-| `site/preview/` | A flat preview with relative links (not committed) |
-| `brand/` | Brand notes, the wordmark and the sun mark |
-| `docs/launch-checklist.md` | What to do before and after launch |
+Output: `site/public/` is the live site to deploy. `site/preview/` is a flat local preview and is not committed.
 
 ## Deploy (Cloudflare Pages, free)
 
-1. In Cloudflare, go to Workers & Pages, then Create, then Pages, then Connect to Git, and pick this repo.
-2. Leave the build command empty and set the output directory to `site/public`.
-3. Add your custom domain.
-4. Submit `https://your-domain/sitemap.xml` in Google Search Console.
+1. Cloudflare → Workers & Pages → Create → Pages → Connect to Git → this repo.
+2. Build command: empty. Output directory: `site/public`.
+3. Add `cleanbymorning.com` as the custom domain.
+4. Submit `https://www.cleanbymorning.com/sitemap.xml` in Google Search Console.
 
 ## Pages
 
 | URL | Page |
 | --- | --- |
-| `/` | Home: instant price and next openings, what's included, prices, how it works, services, areas, FAQ, first-clean offer |
-| `/services/<service>/naples-fl/` | Standard, deep, move-in/move-out, Airbnb and recurring cleaning |
-| `/locations/<area>/` | Old Naples, Park Shore, Pelican Bay, Vanderbilt Beach, North Naples, East Naples, each with its own text |
-| `/pricing/`, `/faq/`, `/about/`, `/book/`, `/contact/` | Supporting pages |
+| `/` | Home: the promise, how it works, price and estimator, neighborhoods, FAQ, contact |
+| `/services/medical-office-cleaning/` and 4 more | Medical, dental, office, gym and studio, post-construction |
+| `/areas/brooklyn/`, `/areas/manhattan/`, `/areas/nassau-county/` | Area pages with their own text and neighborhoods |
+| `/guides/` and 3 guides | Office cleaning cost in NYC, medical office checklist, dental cleaning frequency |
+| `/pricing/`, `/walkthrough/`, `/faq/`, `/about/` | Supporting pages |
+| `/one-pager/` | Capability statement for emails and property managers (not indexed) |
 
-Every page has its own title, meta description, canonical URL and Open Graph tags. The structured data covers LocalBusiness, Service, FAQPage and BreadcrumbList.
+Every page has its own title, description, canonical URL and Open Graph tags. Structured data covers LocalBusiness, Service, Article, FAQPage and BreadcrumbList.
 
-## Booking
+## Photos and font
 
-Until you choose booking software, "Request this clean" opens a pre-filled text (on phones) or email (on computers) with the price, home size and chosen opening. Once you pick a booking tool, set `booking_url` and the button goes there instead.
+| File | Source |
+| --- | --- |
+| `img/brooklyn-bridge-lower-manhattan-night.webp` | Oleg Chursin, Unsplash |
+| `img/lit-office-windows-at-night.webp` | Vladimir Kudinov, Unsplash |
+| `img/morning-at-office-windows.webp` | Charles Forerunner, Unsplash |
+| `img/rain-on-window-city-lights.webp` | Riley Briggs, Unsplash |
+| `fonts/sentient-*.woff2` | Sentient by Indian Type Foundry, from Fontshare (free for commercial use) |
 
-## Photos
-
-| File | Source | Licence |
-| --- | --- | --- |
-| `naples-pier-*.webp` (3) | MJJR, Wikimedia Commons | CC BY 4.0, credited in the footer |
-| `gulf-surf-on-sand.webp`, `palms-on-the-beach.webp`, `wide-beach-with-palms.webp` | Sarah Bürvenich, Florian Klauer, Paula Borowska (Unsplash) | Unsplash licence |
-
-The beach photos are not Naples and are used only as atmosphere. Replace them with your own photos when you can.
+The photos are atmosphere, not your work. Replace them with your own as you get them.
