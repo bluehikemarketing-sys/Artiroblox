@@ -66,12 +66,13 @@ ZIPS = ["34102", "34103", "34104", "34105", "34108", "34109", "34110", "34112", 
 # Pricing: one formula for the quote, the tiles, the tables and the schema
 # ---------------------------------------------------------------------------
 PRICING = {
-    "base": 175, "per_bed": 50, "per_bath": 25,      # one-time standard clean
+    # Matched to the Naples average (HomeAdvisor: $148 a clean, typical $119–$203): a 2-bed, 2-bath clean is $150.
+    "base": 70, "per_bed": 25, "per_bath": 15,      # one-time standard clean
     "mult": {"standard": 1.0, "deep": 1.5, "moveout": 1.6, "airbnb": 0.6},
     "freq": {"once": 0.0, "weekly": 0.20, "biweekly": 0.15, "monthly": 0.10},  # recurring discounts, standard only
-    "minimum": 190,
-    "addons": [["oven", "Inside the oven", 45], ["fridge", "Inside the fridge", 45], ["cabinets", "Inside cabinets", 60],
-               ["baseboards", "Baseboards (included in deep)", 50], ["windows", "Interior windows", 60], ["laundry", "Laundry, wash and fold", 35]],
+    "minimum": 110,
+    "addons": [["oven", "Inside the oven", 35], ["fridge", "Inside the fridge", 35], ["cabinets", "Inside cabinets", 45],
+               ["baseboards", "Baseboards (included in deep)", 35], ["windows", "Interior windows", 45], ["laundry", "Laundry, wash and fold", 25]],
 }
 
 
