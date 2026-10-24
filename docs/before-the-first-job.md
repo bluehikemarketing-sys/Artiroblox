@@ -49,6 +49,18 @@ Researched October 2026. This is a business checklist, not legal advice: have a 
 | 14 | Janitorial bond (covers client property theft) | About $100–300/yr | Expected by medical offices | Lets you say "bonded" truthfully. |
 | 15 | Tell your auto insurer you drive to jobs with equipment | Varies | Yes, practically | A personal policy can deny a claim during business use. You may need a business-use rating or commercial auto. |
 
+### Licenses
+
+There is no state, NYC or Nassau County license for commercial cleaning. The registrations above (the sales tax Certificate of Authority and the LLC filings) are what make you legal. To confirm the NYC side, call 311 or use the NYC Business Toolbox (nyc.gov/BusinessToolbox). A license *is* needed for any of these, so don't do them:
+
+- **Hauling trash away** from a business in NYC: Business Integrity Commission trade-waste license.
+- **Pest control**, including "spraying for bugs": DEC pesticide applicator certification.
+- **Restricted-use pesticides or cooling-tower treatment**: DEC certification. Ordinary disinfectants and sanitizers are exempt from applicator certification under 6 NYCRR 325.7. Buy EPA-registered products from a supplier that sells in New York, because disinfectant products sold in NY must also be registered with the state.
+- **Exterior windows above the ground floor**: covered by NY window-cleaning safety rules. Interior glass is fine.
+- **Repairs beyond simple tasks** like changing a light bulb: these start to look like contracting.
+
+Some Nassau villages regulate door-to-door soliciting. Before dropping in on a village's offices with the one-pager, call the village hall and ask whether a solicitor permit applies.
+
 ### E. New York City traps
 
 - **Trash:** take bags only to the spot where the client's building or hauler collects them. Never carry a client's trash away in your car. In NYC, removing a business's waste is trade-waste hauling and needs a Business Integrity Commission license.
