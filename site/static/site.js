@@ -102,6 +102,24 @@
     targets.forEach(t => t.classList.add('in'));
   }
 
+  // The hero clock: New York time and where the night's work stands
+  document.querySelectorAll('[data-clock]').forEach(el => {
+    const fmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+    const hourOf = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', hourCycle: 'h23' });
+    function tick() {
+      const now = new Date();
+      const h = +hourOf.format(now);
+      let state;
+      if (h >= 18 && h < 22) state = "Offices are being cleaned right now.";
+      else if (h >= 22 || h < 6) state = 'The clean is done. Offices are locked up for the night.';
+      else if (h < 9) state = 'Offices are opening clean this morning.';
+      else state = 'We start at 6:00 PM, after you close.';
+      el.textContent = `It's ${fmt.format(now)} in New York. ${state}`;
+    }
+    tick();
+    setInterval(tick, 30000);
+  });
+
   // The lit neighborhood name moves through the list
   document.querySelectorAll('[data-names]').forEach(p => {
     const names = [...p.querySelectorAll('a')];

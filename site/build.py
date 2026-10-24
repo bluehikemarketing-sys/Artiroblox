@@ -90,8 +90,9 @@ PHOTOS = {
     "windows": {"file": "lit-office-windows-at-night.webp", "w": 1600, "h": 1067, "alt": "Rows of lit office windows on a tower at night"},
     "morning": {"file": "morning-at-office-windows.webp", "w": 1600, "h": 1067, "alt": "People at tall office windows looking over the city in the morning"},
     "rain": {"file": "rain-on-window-city-lights.webp", "w": 1400, "h": 875, "alt": "Rain on a window with city lights behind it at dusk"},
+    "lamp": {"file": "street-lamp-in-snow-at-night.webp", "w": 1600, "h": 1000, "alt": "A street lamp glowing in falling snow late at night"},
 }
-CREDITS = "Photos: Oleg Chursin, Vladimir Kudinov, Charles Forerunner and Riley Briggs, via Unsplash."
+CREDITS = "Photos: Oleg Chursin, Vladimir Kudinov, Charles Forerunner, Riley Briggs and Hide Obara, via Unsplash."
 
 SERVICES = [
     {"key": "medical", "slug": "medical-office-cleaning", "name": "Medical office cleaning", "kind": "medical",
@@ -270,33 +271,160 @@ def faq_schema(items):
 
 
 def crumbs(ctx, label):
-    return f'<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">{E(label)}</li></ol></nav>'
+    return f'<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="{ctx.href("index")}">Home</a></li><li aria-current="page">{E(label)}</li></ol></nav>'
 
 
-def page_head(ctx, h1, lead, photo, second=None):
-    extra = f'<a class="btn btn-line" href="{second[1]}">{E(second[0])}</a>' if second else ""
-    return f'''<section class="wrap page-head"><div class="copy reveal"><h1>{E(h1)}</h1><p class="lead">{E(lead)}</p>
-<div class="hero-cta" style="justify-content:flex-start"><a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a>{extra}</div></div>
-<div class="head-photo tint shutter">{ctx.img(photo, lazy=False)}</div></section>'''
+# ---------------------------------------------------------------------------
+# Design: every page is one night. It opens at dusk in cobalt, darkens through the clean
+# and brightens to morning. Section grounds are flat steps (g-dusk → g-s6 → g-dawn → g-day),
+# never gradients. Yellow is the horizon bar from the logo and the main button.
+# ---------------------------------------------------------------------------
+MARK = ('<svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="currentColor"/>'
+        '<rect x="14" y="40" width="36" height="10" fill="#e9e34a"/></svg>')
+
+SHORT = {
+    "medical": "Exam rooms, waiting room and restrooms, disinfected every visit.",
+    "dental": "Operatory floors, sterilization area, reception and restrooms.",
+    "office": "Desks, kitchens, restrooms and floors, before your team arrives.",
+    "gym": "Studio floors, locker rooms, showers and equipment touch points.",
+    "postcon": "A one-time clean after a build-out, so you can open.",
+}
+
+# A typical night: (time, period, heading, text, photo, ground)
+NIGHT = [
+    ("6:00", "PM", "You lock up", "Leave when your last patient does. We already have the key, the alarm code and your checklist.", "rain", "g-dusk"),
+    ("6:30", "PM", "We let ourselves in", "Usually the same person every night, through the entrance your building assigns. Alarm off, lights on.", None, "g-s1"),
+    ("7:00", "PM", "Exam rooms and operatories", "Counters, chairs, door handles and switches disinfected, with EPA-registered products left wet for their full contact time.", None, "g-s2"),
+    ("8:15", "PM", "Restrooms", "Scrubbed with their own color-coded cloths, disinfected, and restocked with paper and soap.", None, "g-s3"),
+    ("9:00", "PM", "Floors and trash", "Carpets vacuumed, hard floors damp-mopped with a clean head for each area, trash and recycling out.", None, "g-s4"),
+    ("9:45", "PM", "Lights off, alarm on", "We photograph every room, set the alarm and lock the door behind us.", "lamp", "g-s5"),
+    ("3:00", "AM", "The office sits clean", "Nothing moves until morning.", "bridge", "g-s6"),
+    ("6:30", "AM", "Photos in your inbox", "Pictures of every room, sent when we finished, waiting when you wake up.", None, "g-dawn"),
+    ("7:45", "AM", "You open", "Your team walks into a clean office. Billing is one monthly autopay, with nothing to chase.", "morning", "g-day"),
+]
 
 
-def photo_row(ctx, keys, caption):
-    figs = "".join(f'<div class="tint">{ctx.img(k)}</div>' for k in keys)
-    return f'<section class="section"><div class="wrap"><figure class="photo-row reveal">{figs}<figcaption class="small">{E(caption)}</figcaption></figure></div></section>'
+def fig(ctx, key, cls="", lazy=True, tint=True):
+    t = " tint" if tint else ""
+    return f'<figure class="ph{t} {cls}">{ctx.img(key, lazy=lazy)}</figure>'
+
+
+def ctas(ctx, second=None, on_light=False):
+    first = "btn-cobalt" if on_light else "btn-sun"
+    extra = f'<a class="btn btn-ghost" href="{second[1]}">{E(second[0])}</a>' if second else ""
+    return f'<div class="ctas"><a class="btn {first}" href="{ctx.href("walkthrough")}">Book a walkthrough</a>{extra}</div>'
+
+
+def page_head(ctx, label, h1, lead, photo, second=None):
+    return f'''<section class="g g-dusk head"><div class="wrap head-grid">
+<div class="head-copy">{crumbs(ctx, label)}<h1>{E(h1)}</h1><span class="horizon" aria-hidden="true"></span><p class="lead">{E(lead)}</p>{ctas(ctx, second)}</div>
+{fig(ctx, photo, "head-photo shutter", lazy=False)}</div></section>'''
+
+
+def sec_head(h2, lead=""):
+    p = f'<p class="lead">{E(lead)}</p>' if lead else ""
+    return f'<div class="sec-head"><h2>{E(h2)}</h2>{p}</div>'
+
+
+def night_sheet(ctx):
+    rows = []
+    for t, ap, h, txt, photo, g in NIGHT:
+        ph = fig(ctx, photo, "row-photo", tint=(g != "g-day")) if photo else ""
+        rows.append(f'''<li class="g {g} row"><div class="wrap row-grid reveal"><p class="time num">{t}<span>{ap}</span></p>
+<div class="row-copy"><h3>{E(h)}</h3><p>{E(txt)}</p></div>{ph}</div></li>''')
+    return f'''<section class="sheet" aria-labelledby="night-h">
+<div class="g g-dusk sheet-intro"><div class="wrap">{sec_head("One night at your office", "A typical evening at a 2,000 square foot practice, cleaned three nights a week.").replace("<h2>", '<h2 id="night-h">', 1)}</div></div>
+<ol class="rows">{"".join(rows)}</ol></section>'''
+
+
+def services_list(ctx, heading="What we clean", lead="Five kinds of space. Each gets its own written checklist.", exclude=None):
+    items = []
+    for s in SERVICES:
+        if s is exclude:
+            continue
+        price = f"from ${postcon_price(1000)}" if s["kind"] == "postcon" else f"from ${PRICING['min_visit']} a visit"
+        items.append(f'<li><a href="{ctx.href("svc:" + s["key"])}"><span class="svc-name">{E(s["name"])}</span>'
+                     f'<span class="svc-line">{E(SHORT[s["key"]])}</span><span class="svc-price num">{price}</span></a></li>')
+    return f'<section class="g g-day section" id="services"><div class="wrap">{sec_head(heading, lead)}<ul class="svc-list reveal">{"".join(items)}</ul></div></section>'
+
+
+def price_band(ctx, heading_html, note, preset="medical", anchor="pricing"):
+    return f'''<section class="g g-dawn section" id="{anchor}"><div class="wrap price-grid">
+<div class="price-copy"><h2>{heading_html}</h2><p>{E(note)}</p>{ctas(ctx, ("Full price list", ctx.href("pricing")), on_light=True)}</div>
+{estimator(preset)}</div></section>'''
+
+
+def estimator(preset="medical"):
+    kinds = [("medical", "Medical"), ("dental", "Dental"), ("office", "Office"), ("gym", "Gym or studio"), ("postcon", "Post-construction, one time")]
+    chips = "".join(f'<label class="chip"><input type="radio" name="kind" value="{k}"{" checked" if k == preset else ""}><span>{n}</span></label>' for k, n in kinds)
+    nights = "".join(f'<label class="chip"><input type="radio" name="nights" value="{n}"{" checked" if n == 3 else ""}><span>{n}</span></label>' for n in range(1, 8))
+    rest = "".join(f'<option value="{n}"{" selected" if n == 2 else ""}>{n}</option>' for n in range(0, 9))
+    if preset == "postcon":
+        figure, detail = postcon_price(2000), "One-time clean, 2,000 sq ft."
+    else:
+        figure, detail = monthly_price(preset, 2000, 2, 3), f"About ${visit_price(preset, 2000, 2)} a visit, 3 nights a week."
+    return f'''<form class="estimator" data-ui data-estimator novalidate aria-label="Cleaning price estimator">
+<div class="est-fields">
+<h3>Estimate your price</h3>
+<fieldset class="field"><legend>Type of space</legend><div class="chips">{chips}</div></fieldset>
+<div class="field"><label for="e-sqft">Square feet: <span data-sqft-out class="num">2,000</span></label><input id="e-sqft" name="sqft" type="range" min="500" max="15000" step="250" value="2000"></div>
+<fieldset class="field" data-recurring><legend>Nights a week</legend><div class="chips">{nights}</div></fieldset>
+<div class="field" data-recurring><label for="e-rest">Restrooms</label><select id="e-rest" name="restrooms">{rest}</select></div>
+</div>
+<div class="est-result" aria-live="polite">
+<p class="small" data-est-label>{"One-time price" if preset == "postcon" else "Estimated monthly price"}</p>
+<p class="est-figure num" data-est-figure>${figure:,}</p>
+<p data-est-detail>{detail}</p>
+<p class="small">An estimate before tax. We confirm the price after a 15-minute walkthrough.</p>
+<a class="btn btn-sun" data-est-cta href="#">Book a walkthrough</a>
+</div>
+</form>'''
+
+
+def areas_band(ctx, heading="Where we clean"):
+    photos = {"brooklyn": "bridge", "manhattan": "windows", "nassau-county": "morning"}
+    cols = "".join(f'''<div class="area reveal">{fig(ctx, photos[a["slug"]])}<h3><a href="{ctx.href("area:" + a["slug"])}">{E(a["name"])}</a></h3>
+<p>{E(", ".join(a["hoods"][:5]))} and more.</p></div>''' for a in AREAS)
+    return f'<section class="g g-night section" id="areas"><div class="wrap">{sec_head(heading, "We drive to every job, so the outer neighborhoods cost the same as the ones by the bridges.")}<div class="area-cols">{cols}</div></div></section>'
+
+
+def faq_table(items, heading="Questions"):
+    rows = "".join(f'<details class="faq"{" open" if i == 0 else ""}><summary>{E(q)}</summary><p>{E(a)}</p></details>' for i, (q, a) in enumerate(items))
+    return f'''<section class="g g-day section" id="faq"><div class="wrap faq-grid"><h2>{E(heading)}</h2>
+<div class="faq-list reveal">{rows}</div></div></section>'''
+
+
+def contact_field(ctx):
+    user, dom = B["email"].split("@")
+    return f'''<section class="g g-sun section contact" id="contact"><div class="wrap contact-grid">
+<div class="contact-copy"><h2>Get a price by morning</h2><p class="lead">Email or text your square footage and how many nights a week. We reply with a price by the next morning.</p></div>
+<div class="contact-ways"><a class="mail-line" href="mailto:{B["email"]}?subject=Cleaning%20quote">{E(user)}@<wbr>{E(dom)}</a>
+<a class="phone num" href="tel:{B["phone_e164"]}">{E(B["phone_display"])}</a>
+{ctas(ctx, ("Capability statement", ctx.href("one-pager")), on_light=True)}</div>
+</div></section>'''
+
+
+def link_band(ctx, heading, groups):
+    cols = "".join(f'<div><h3>{E(t)}</h3><ul class="link-list">{"".join(f"<li><a href={chr(34)}{h}{chr(34)}>{E(n)}</a></li>" for n, h in links)}</ul></div>' for t, links in groups)
+    return f'<section class="g g-day section tight"><div class="wrap"><h2 class="visually-hidden">{E(heading)}</h2><div class="link-cols">{cols}</div></div></section>'
 
 
 # ---------------------------------------------------------------------------
 # Shell
 # ---------------------------------------------------------------------------
-NAV = [("services", "Services"), ("areas", "Areas"), ("pricing", "Pricing")]
+NAV = [("services", "Services"), ("areas", "Areas"), ("pricing", "Pricing"), ("faq", "FAQ")]
 
 
 def nav_href(ctx, k):
     if k == "services":
-        return ctx.href("svc:medical")
+        return ctx.href("index", "#services")
     if k == "areas":
         return ctx.href("index", "#areas")
     return ctx.href(k)
+
+
+def wordmark(ctx):
+    return f'<a class="wordmark" href="{ctx.href("index")}">{MARK}<span>Clean by Morning</span></a>'
 
 
 def header(ctx, active):
@@ -304,35 +432,39 @@ def header(ctx, active):
     links = "".join(f'<a href="{nav_href(ctx, k)}"{cur if k == active else ""}>{n}</a>' for k, n in NAV)
     menu = "".join(f'<a href="{ctx.href("svc:" + s["key"])}">{E(s["name"])}</a>' for s in SERVICES)
     menu += "".join(f'<a href="{ctx.href("area:" + a["slug"])}">{E(a["name"])}</a>' for a in AREAS)
-    menu += f'<a href="{ctx.href("pricing")}">Pricing</a><a href="{ctx.href("faq")}">FAQ</a><a href="{ctx.href("guides")}">Guides</a><a href="{ctx.href("walkthrough")}">Book a walkthrough</a>'
+    menu += (f'<a href="{ctx.href("pricing")}">Pricing</a><a href="{ctx.href("faq")}">FAQ</a><a href="{ctx.href("guides")}">Guides</a>'
+             f'<a href="{ctx.href("about")}">About</a><a href="tel:{B["phone_e164"]}">Call {E(B["phone_display"])}</a>')
     bar = ""
     if ctx.preview:
-        bar = ('<div class="preview-bar"><div class="wrap"><strong>Preview</strong><span>The phone number is a placeholder. The form opens an email until a form service is connected.</span>'
-               '<a href="one-pager.html">Capability statement</a><a href="home.html">Home</a></div></div>')
-    return f'''{bar}<header class="site-header"><div class="wrap">
-<a class="wordmark" href="{ctx.href("index")}">Clean by Morning</a>
-<nav class="nav" aria-label="Main">{links}</nav>
-<a class="btn btn-paper header-cta" href="{ctx.href("walkthrough")}">Book a walkthrough</a>
-<details class="menu"><summary>Menu</summary><nav class="menu-panel" aria-label="Menu">{menu}</nav></details>
+        bar = ('<div class="g g-sun preview-bar"><div class="wrap"><strong>Preview</strong><span>The walkthrough form opens an email until a form service is connected.</span>'
+               '<a href="one-pager.html">Capability statement</a></div></div>')
+    return f'''{bar}<header class="g g-dusk site-header"><div class="wrap bar">
+{wordmark(ctx)}
+<nav class="nav" aria-label="Main">{links}<a class="num" href="tel:{B["phone_e164"]}">{E(B["phone_display"])}</a></nav>
+<a class="btn btn-sun header-cta" href="{ctx.href("walkthrough")}">Book a walkthrough</a>
+<details class="menu"><summary>Menu</summary><nav class="menu-panel g g-night" aria-label="Menu">{menu}</nav></details>
 </div></header>'''
 
 
 def footer(ctx):
-    svc = " · ".join(f'<a href="{ctx.href("svc:" + s["key"])}">{E(s["name"])}</a>' for s in SERVICES)
-    areas = " · ".join(f'<a href="{ctx.href("area:" + a["slug"])}">{E(a["name"])}</a>' for a in AREAS)
-    social = " · ".join(f'<a href="{E(u)}">{E(u.split("//")[-1].split("/")[0])}</a>' for u in B["same_as"])
-    return f'''<footer class="site-footer"><div class="wrap">
-<div class="foot-top"><div class="foot-notes"><strong>Clean by Morning</strong><span>Evening cleaning for medical, dental and office spaces in Brooklyn, Manhattan and Nassau County.</span>
-<span>{E(B["cleaning_hours"])}. {E(B["office_hours"])}.</span></div><a href="#main">Back to top</a></div>
+    def col(title, links):
+        return f'<nav class="foot-col" aria-label="{E(title)}"><h2>{E(title)}</h2>{"".join(f"<a href={chr(34)}{h}{chr(34)}>{E(n)}</a>" for n, h in links)}</nav>'
+    svc = [(s["name"], ctx.href("svc:" + s["key"])) for s in SERVICES]
+    areas = [(a["name"], ctx.href("area:" + a["slug"])) for a in AREAS] + [(u.split("//")[-1].split("/")[0], u) for u in B["same_as"]]
+    company = [("Pricing", ctx.href("pricing")), ("FAQ", ctx.href("faq")), ("Guides", ctx.href("guides")), ("About", ctx.href("about")),
+               ("Book a walkthrough", ctx.href("walkthrough")), ("Capability statement", ctx.href("one-pager"))]
+    return f'''<footer class="g g-night site-footer"><div class="wrap">
+<div class="foot-grid"><div class="foot-brand">{wordmark(ctx)}<p>Evening cleaning for medical, dental and office spaces in Brooklyn, Manhattan and Nassau County.</p>
+<p>{E(B["cleaning_hours"])}.<br>{E(B["office_hours"])}.</p></div>
+{col("Services", svc)}{col("Areas", areas)}{col("Company", company)}</div>
 <a class="phone-line num" href="tel:{B["phone_e164"]}">{E(B["phone_display"])}</a>
-<div class="foot-links"><span>{svc}</span><span>{areas}</span><span><a href="{ctx.href("pricing")}">Pricing</a> · <a href="{ctx.href("faq")}">FAQ</a> · <a href="{ctx.href("guides")}">Guides</a> · <a href="{ctx.href("about")}">About</a> · <a href="{ctx.href("walkthrough")}">Walkthrough</a></span>{f"<span>{social}</span>" if social else ""}</div>
-<div class="foot-meta"><span>{E(B["email"])}</span><span>{CREDITS}</span><span>{E(B["city_line"])} · © {B["year"]} {E(B["legal_name"])}</span></div>
+<div class="foot-meta"><a href="mailto:{B["email"]}">{E(B["email"])}</a><span>{E(B["city_line"])} · © {B["year"]} {E(B["legal_name"])}</span><span>{CREDITS}</span><a href="#main">Back to top</a></div>
 </div></footer>'''
 
 
 def action_bar(ctx):
-    return (f'<div class="action-bar"><a class="btn btn-line" href="tel:{B["phone_e164"]}">Call</a>'
-            f'<a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a></div>')
+    return (f'<div class="action-bar g g-night"><a class="btn btn-ghost" href="tel:{B["phone_e164"]}">Call</a>'
+            f'<a class="btn btn-sun" href="{ctx.href("walkthrough")}">Book a walkthrough</a></div>')
 
 
 def page(ctx, key, title, desc, body, active=None, schema=(), noindex=False, wrapper=True):
@@ -382,90 +514,22 @@ def page(ctx, key, title, desc, body, active=None, schema=(), noindex=False, wra
 
 
 # ---------------------------------------------------------------------------
-# Components
-# ---------------------------------------------------------------------------
-def estimator(preset="medical"):
-    kinds = [("medical", "Medical"), ("dental", "Dental"), ("office", "Office"), ("gym", "Gym or studio"), ("postcon", "Post-construction, one time")]
-    chips = "".join(f'<label class="chip"><input type="radio" name="kind" value="{k}"{" checked" if k == preset else ""}><span>{n}</span></label>' for k, n in kinds)
-    nights = "".join(f'<label class="chip"><input type="radio" name="nights" value="{n}"{" checked" if n == 3 else ""}><span>{n}</span></label>' for n in range(1, 8))
-    rest = "".join(f'<option value="{n}"{" selected" if n == 2 else ""}>{n}</option>' for n in range(0, 9))
-    if preset == "postcon":
-        figure, detail = postcon_price(2000), "One-time clean, 2,000 sq ft."
-    else:
-        figure, detail = monthly_price(preset, 2000, 2, 3), f"About ${visit_price(preset, 2000, 2)} a visit, 3 nights a week."
-    return f'''<form class="estimator" data-ui data-estimator novalidate aria-label="Cleaning price estimator">
-<div class="est-fields">
-<h3>Estimate your price</h3>
-<fieldset class="field"><legend>Type of space</legend><div class="chips">{chips}</div></fieldset>
-<div class="field"><label for="e-sqft">Square feet: <span data-sqft-out class="num">2,000</span></label><input id="e-sqft" name="sqft" type="range" min="500" max="15000" step="250" value="2000"></div>
-<fieldset class="field" data-recurring><legend>Nights a week</legend><div class="chips">{nights}</div></fieldset>
-<div class="field" data-recurring><label for="e-rest">Restrooms</label><select id="e-rest" name="restrooms">{rest}</select></div>
-</div>
-<div class="est-result" aria-live="polite">
-<p class="small" data-est-label>{"One-time price" if preset == "postcon" else "Estimated monthly price"}</p>
-<p class="est-figure" data-est-figure>${figure:,}</p>
-<p data-est-detail>{detail}</p>
-<p class="small">An estimate before tax. We confirm the price after a 15-minute walkthrough.</p>
-<a class="btn btn-accent" data-est-cta href="#">Book a walkthrough</a>
-</div>
-</form>'''
-
-
-def faq_table(items, heading="Questions"):
-    rows = "".join(f'<div class="faq-row reveal"><h3 class="q">{E(q)}</h3><p class="a">{E(a)}</p></div>' for q, a in items)
-    return f'''<section class="section" id="faq"><div class="wrap faq-table">
-<div class="faq-row head"><h2 class="q">{E(heading)}</h2><span></span></div>{rows}</div></section>'''
-
-
-def contact_field(ctx):
-    user, dom = B["email"].split("@")
-    return f'''<section class="contact-field" id="contact"><div class="wrap">
-<p class="ask">Send us your square footage and how many nights a week. We'll reply with a price the same day.</p>
-<a class="mail-line" href="mailto:{B["email"]}?subject=Cleaning%20quote">{E(user)}@<wbr>{E(dom)}</a>
-<div class="contact-corners"><span><a href="tel:{B["phone_e164"]}" class="num">{E(B["phone_display"])}</a> · {E(B["city_line"])}</span>
-<span><a href="{ctx.href("walkthrough")}">Book a walkthrough</a> · <a href="{ctx.href("one-pager")}">Capability statement</a></span></div>
-</div></section>'''
-
-
-# ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
 def home(ctx, wrapper=True):
-    hoods = [f'<a href="{ctx.href("area:" + a["slug"])}">{E(h)}</a>' for a in AREAS for h in a["hoods"][:3]]
-    names = ", ".join(hoods[:-1]) + " and " + hoods[-1]
     proof = proof_lines()
-    clients = f' Clients include {E(", ".join(PROOF["clients"]))}.' if PROOF["clients"] else ""
-    proof_html = f'<ul class="list">{"".join(f"<li>{E(x)}</li>" for x in proof)}</ul>' if proof else ""
-    body = f'''<section class="hero">
-<div class="hero-media tint shutter">{ctx.img("bridge", lazy=False)}</div>
-<div class="wrap hero-inner">
-<h1>Medical offices, clean by morning</h1>
-<p class="horizon"><span class="h-left">Evening cleaning for medical, dental and office spaces</span><span class="h-right">in Brooklyn, Manhattan and Nassau County.</span></p>
-<div class="hero-cta"><a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a><a class="btn btn-line" href="#pricing">See prices</a></div>
+    clients = f'<p class="small">Clients include {E(", ".join(PROOF["clients"]))}.</p>' if PROOF["clients"] else ""
+    proof_html = f'<ul class="checks proof">{"".join(f"<li>{E(x)}</li>" for x in proof)}</ul>' if proof else ""
+    body = f'''<section class="g g-dusk hero"><div class="wrap hero-grid">
+<div class="hero-copy"><h1>Medical offices, clean by morning</h1><span class="horizon" aria-hidden="true"></span>
+<p class="lead">Evening cleaning for medical, dental and office spaces in Brooklyn, Manhattan and Nassau County. You lock up at 6. We're done before you open.</p>
+{ctas(ctx, ("See prices", "#pricing"))}{proof_html}{clients}</div>
+<figure class="ph tint hero-photo shutter">{ctx.img("windows", lazy=False)}<figcaption class="clock" data-clock>We clean between 6 PM and 2 AM, after you close.</figcaption></figure>
 </div></section>
-
-<section class="section" id="what"><div class="wrap reveal">
-<h2 class="visually-hidden">What we do</h2>
-<p class="picture-para">We arrive after your last patient leaves <span class="slot" aria-hidden="true">{ctx.img("windows")}</span>, disinfect every exam room and restroom, and lock up by midnight <span class="slot" aria-hidden="true">{ctx.img("rain")}</span>. You get photos before you open.</p>
-<div class="after-para"><p>One owner-operated crew, one written checklist, month-to-month contracts.{clients}</p>{proof_html}
-<a class="btn btn-accent" href="{ctx.href("svc:medical")}">What a medical clean includes</a></div>
-</div></section>
-
-<section class="verbs" aria-label="How it works">
-<div class="panel">{ctx.img("rain")}<div class="verb-track"><p class="verb">Lock up</p></div><p class="panel-note">You close at 6 and leave. We have the key, the alarm code and the checklist.</p></div>
-<div class="panel">{ctx.img("windows")}<div class="verb-track"><p class="verb">We clean</p></div><p class="panel-note">Exam rooms, restrooms, floors and trash, the same way every night. Photos when we finish.</p></div>
-<div class="panel">{ctx.img("morning")}<div class="verb-track"><p class="verb">Open up</p></div><p class="panel-note">Your team walks into a clean office. Billing is one monthly autopay, nothing to chase.</p></div>
-</section>
-
-<section class="price-section" id="pricing"><div class="wrap">
-<h2 class="price-sentence">From <span class="price-block num">${PRICING["min_visit"]}</span> a night</h2>
-<div class="price-row"><p>About ${PRICING["hourly"]} per cleaning hour, with supplies included. Monthly autopay, month to month, 30 days' notice to cancel.</p>
-<a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a></div>
-{estimator()}
-</div></section>
-
-<section class="wrap" id="areas" aria-label="Where we clean"><p class="names reveal" data-names><span class="lead-in">We clean in</span> {names}.</p></section>
-
+{night_sheet(ctx)}
+{services_list(ctx)}
+{price_band(ctx, f'From <span class="price-block num">${PRICING["min_visit"]}</span> a night', f"About ${PRICING['hourly']} per cleaning hour, with supplies included. Monthly autopay, month to month, 30 days' notice to cancel.")}
+{areas_band(ctx)}
 {faq_table(FAQ[:6])}
 {contact_field(ctx)}'''
     return page(ctx, "index", "Medical & Office Cleaning NYC and Long Island | Clean by Morning",
@@ -477,8 +541,6 @@ def service_page(ctx, s):
     trail = [("index", "Home"), ("svc:" + s["key"], s["name"])]
     nightly = "".join(f"<li>{E(x)}</li>" for x in s["nightly"])
     clinical = "".join(f"<li>{E(x)}</li>" for x in s["clinical"])
-    areas = "".join(f'<li><a href="{ctx.href("area:" + a["slug"])}">{E(s["name"])} in {E(a["name"])}</a></li>' for a in AREAS)
-    others = "".join(f'<li><a href="{ctx.href("svc:" + o["key"])}">{E(o["name"])}</a></li>' for o in SERVICES if o is not s)
     if s["kind"] == "postcon":
         start = postcon_price(1000)
         price_line = f'From <span class="price-block num">${start}</span>, one time'
@@ -491,17 +553,14 @@ def service_page(ctx, s):
               "areaServed": ["Brooklyn, NY", "Manhattan, NY", "Nassau County, NY"],
               "offers": {"@type": "Offer", "priceCurrency": "USD", "price": str(start)}, "url": ctx.canonical("svc:" + s["key"])}
     photo = {"medical": "windows", "dental": "morning", "office": "bridge", "gym": "rain", "postcon": "morning"}[s["key"]]
-    body = f'''{crumbs(ctx, s["name"])}
-{page_head(ctx, s["h1"], s["lead"], photo, ("Estimate the price", "#estimate"))}
-<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>Every visit</h2></div><div class="right5"><ul class="list">{nightly}</ul></div></div></section>
-{photo_row(ctx, [k for k in ("bridge", "rain", "windows", "morning") if k != photo], "After hours in New York: we start when you lock up.")}
-<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>How we work</h2></div><div class="right5"><ul class="list">{clinical}</ul></div></div></section>
-<section class="price-section" id="estimate" style="margin-top:clamp(120px,14vw,220px)"><div class="wrap">
-<h2 class="price-sentence">{price_line}</h2>
-<div class="price-row"><p>{price_note}</p><a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a></div>
-{estimator(s["kind"])}</div></section>
+    second = "Every visit" if s["kind"] != "postcon" else "What we clean"
+    body = f'''{page_head(ctx, s["name"], s["h1"], s["lead"], photo, ("Estimate the price", "#estimate"))}
+<section class="g g-day section"><div class="wrap split reveal"><div>{sec_head(second, "The checklist we start from. We adjust it to your space at the walkthrough.")}</div><ul class="checks big">{nightly}</ul></div></section>
+<section class="g g-night section"><div class="wrap">{sec_head("How we work")}<ul class="tiles reveal">{clinical}</ul></div></section>
+{price_band(ctx, price_line, price_note, s["kind"], "estimate")}
 {faq_table(s["faq"], "Questions about " + s["name"].lower())}
-<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>Where we do it</h2></div><div class="right5 stack"><ul class="link-row">{areas}</ul><ul class="link-row">{others}</ul></div></div></section>
+{link_band(ctx, "Related", [("Where we do it", [(f'{s["name"]} in {a["name"]}', ctx.href("area:" + a["slug"])) for a in AREAS]),
+                            ("Other services", [(o["name"], ctx.href("svc:" + o["key"])) for o in SERVICES if o is not s])])}
 {contact_field(ctx)}'''
     return page(ctx, "svc:" + s["key"], s["title"], s["lead"][:155], body, active="services",
                 schema=[schema, crumbs_schema(ctx, trail), faq_schema(s["faq"])])
@@ -510,17 +569,15 @@ def service_page(ctx, s):
 def area_page(ctx, a):
     trail = [("index", "Home"), ("area:" + a["slug"], a["name"])]
     paras = "".join(f"<p>{E(p)}</p>" for p in a["body"])
-    svc = "".join(f'<li><a href="{ctx.href("svc:" + s["key"])}">{E(s["name"])}</a></li>' for s in SERVICES)
     hoods = ", ".join(a["hoods"][:-1]) + " and " + a["hoods"][-1]
-    others = "".join(f'<li><a href="{ctx.href("area:" + o["slug"])}">{E(o["name"])}</a></li>' for o in AREAS if o is not a)
     schema = business_schema() | {"areaServed": {"@type": "Place", "name": a["name"] + ", NY"}}
     photo = "morning" if a["slug"] == "nassau-county" else ("bridge" if a["slug"] == "brooklyn" else "windows")
-    body = f'''{crumbs(ctx, a["name"])}
-{page_head(ctx, a["h1"], a["lead"], photo, ("See prices", ctx.href("pricing")))}
-<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>Cleaning in {E(a["name"])}</h2></div><div class="right5 stack">{paras}</div></div></section>
-<section class="wrap" aria-label="Neighborhoods"><p class="names reveal"><span class="lead-in">In {E(a["name"])} we clean in</span> {E(hoods)}.</p></section>
-<section class="section" style="padding-top:0"><div class="wrap grid reveal"><div class="left6"><h2>Services in {E(a["name"])}</h2></div><div class="right5 stack"><ul class="link-row">{svc}</ul><p>We also serve</p><ul class="link-row">{others}</ul></div></div></section>
-{photo_row(ctx, [k for k in ("bridge", "rain", "windows", "morning") if k != photo], "Evenings in New York, when we work.")}
+    trio = "".join(fig(ctx, k) for k in ("rain", "lamp", "bridge", "windows", "morning") if k != photo)
+    body = f'''{page_head(ctx, a["name"], a["h1"], a["lead"], photo, ("See prices", ctx.href("pricing")))}
+<section class="g g-day section"><div class="wrap split reveal"><div>{sec_head("Cleaning in " + a["name"])}</div><div class="prose">{paras}</div></div></section>
+<section class="g g-night section"><div class="wrap"><p class="names reveal">In {E(a["name"])} we clean in {E(hoods)}.</p><div class="photo-strip">{trio}</div></div></section>
+{services_list(ctx, "Services in " + a["name"], "The same checklist and the same monthly pricing in every neighborhood.")}
+{link_band(ctx, "Other areas", [("We also serve", [(o["name"], ctx.href("area:" + o["slug"])) for o in AREAS if o is not a]), ("Prices", [("Price list", ctx.href("pricing")), ("Estimate yours", ctx.href("pricing", "#estimate"))])])}
 {contact_field(ctx)}'''
     return page(ctx, "area:" + a["slug"], f'Office & Medical Cleaning {a["name"]}, NY | Clean by Morning', a["lead"][:155], body, active="areas",
                 schema=[schema, crumbs_schema(ctx, trail)])
@@ -536,18 +593,15 @@ def pricing_page(ctx):
         rows.append(f'<tr><th scope="row">{n}</th>{cells}</tr>')
     rows.append('<tr><th scope="row">Post-construction, one time</th>' + "".join(f'<td class="n">${postcon_price(sz):,}</td>' for sz in sizes) + "</tr>")
     head = "".join(f"<th>{sz:,} sq ft</th>" for sz in sizes)
-    body = f'''{crumbs(ctx, "Pricing")}
-{page_head(ctx, "Office cleaning prices", "Monthly prices for evening cleaning in Brooklyn, Manhattan and Nassau County, before tax. Billed once a month by autopay.", "rain", ("Estimate yours", "#estimate"))}
-<section class="section"><div class="wrap stack reveal"><h2>Prices by size</h2>
-<div class="table-scroll"><table class="price-table"><thead><tr><th>Space and schedule</th>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>
+    body = f'''{page_head(ctx, "Pricing", "Office cleaning prices", "Monthly prices for evening cleaning in Brooklyn, Manhattan and Nassau County, before tax. Billed once a month by autopay.", "rain", ("Estimate yours", "#estimate"))}
+<section class="g g-day section"><div class="wrap">{sec_head("Prices by size", "Monthly, before tax, for a typical number of restrooms at each size.")}
+<div class="table-scroll reveal"><table class="price-table"><thead><tr><th>Space and schedule</th>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>
 <p class="note">Monthly figures assume {PRICING["weeks_per_month"]} weeks a month and 1–4 restrooms by size. New York sales tax applies to commercial cleaning. Your exact price comes after a 15-minute walkthrough.</p>
 </div></section>
-{photo_row(ctx, ["bridge", "windows", "morning"], "Priced by the hour of cleaning, not by guesswork.")}
-<section class="price-section" id="estimate" style="margin-top:clamp(120px,14vw,220px)"><div class="wrap">
-<h2 class="price-sentence">Your price, in a minute</h2>{estimator()}</div></section>
-<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>How billing works</h2></div><div class="right5"><ul class="list">
-<li>One monthly price, billed on the 1st by ACH autopay</li><li>First month paid before the first clean</li><li>Month to month; 30 days' notice to cancel</li>
-<li>One-time jobs: {int(PRICING["deposit"] * 100)}% deposit to book, the rest on completion</li><li>Restroom paper, soap and liners restocked at cost if you want</li></ul></div></div></section>
+{price_band(ctx, "Your price, in a minute", f"Pick your space, size and nights. The same model as the table: about ${PRICING['hourly']} per cleaning hour with a ${PRICING['min_visit']} minimum a visit.", "medical", "estimate")}
+<section class="g g-night section"><div class="wrap">{sec_head("How billing works")}<ul class="tiles reveal">
+<li>One monthly price, billed on the 1st by ACH autopay</li><li>First month paid before the first clean</li><li>Month to month, with 30 days' notice to cancel</li>
+<li>One-time jobs: {int(PRICING["deposit"] * 100)}% deposit to book, the rest on completion</li></ul></div></section>
 {contact_field(ctx)}'''
     return page(ctx, "pricing", "Office Cleaning Prices NYC & Long Island | Clean by Morning",
                 f"Monthly prices for medical, dental, office and gym cleaning in Brooklyn, Manhattan and Nassau County. From ${PRICING['min_visit']} a visit.",
@@ -557,12 +611,12 @@ def pricing_page(ctx):
 def walkthrough_page(ctx):
     trail = [("index", "Home"), ("walkthrough", "Book a walkthrough")]
     opts = "".join(f"<option>{E(s['name'])}</option>" for s in SERVICES)
-    body = f'''{crumbs(ctx, "Book a walkthrough")}
-<section class="section" style="padding-top:clamp(48px,6vw,96px)"><div class="wrap grid">
-<div class="left6 stack reveal"><h1 style="font-size:var(--step-head)">Book a 15-minute walkthrough</h1><p class="statement">We look at the space, agree on the checklist and send a fixed monthly price the same day.</p>
-<ul class="list"><li>Free, with no obligation</li><li>Before or after your hours, whichever suits you</li><li>Price in writing within 24 hours</li><li>Most clients start within a week</li></ul>
-<p>Rather talk? Call <a href="tel:{B["phone_e164"]}" class="num">{E(B["phone_display"])}</a>.</p></div>
-<form class="form right5" data-walkthrough novalidate aria-label="Walkthrough request">
+    body = f'''<section class="g g-dusk head"><div class="wrap head-grid form-grid">
+<div class="head-copy">{crumbs(ctx, "Book a walkthrough")}<h1>Book a 15-minute walkthrough</h1><span class="horizon" aria-hidden="true"></span>
+<p class="lead">We look at the space, agree on the checklist and send a fixed monthly price by the next morning.</p>
+<ul class="checks"><li>Free, with no obligation</li><li>Before or after your hours, whichever suits you</li><li>Price in writing within 24 hours</li><li>Most clients can start within a week</li></ul>
+<p>Rather talk? Call or text <a href="tel:{B["phone_e164"]}" class="num">{E(B["phone_display"])}</a>.</p></div>
+<form class="form" data-walkthrough novalidate aria-label="Walkthrough request">
 <div class="field"><label for="w-name">Your name</label><input id="w-name" name="name" type="text" autocomplete="name" required></div>
 <div class="field"><label for="w-company">Practice or company</label><input id="w-company" name="company" type="text" autocomplete="organization"></div>
 <div class="field"><label for="w-email">Email</label><input id="w-email" name="email" type="email" autocomplete="email" required></div>
@@ -571,7 +625,7 @@ def walkthrough_page(ctx):
 <div class="field"><label for="w-address">Address or neighborhood</label><input id="w-address" name="address" type="text" autocomplete="street-address"></div>
 <div class="field"><label for="w-sqft">Approximate square feet</label><input id="w-sqft" name="sqft" type="text" inputmode="numeric"></div>
 <div class="field"><label for="w-notes">Nights a week, and anything else</label><textarea id="w-notes" name="notes"></textarea></div>
-<button class="btn" type="submit">Request a walkthrough</button><p class="form-msg" data-form-msg role="status"></p>
+<button class="btn btn-cobalt" type="submit">Request a walkthrough</button><p class="form-msg" data-form-msg role="status"></p>
 </form></div></section>'''
     return page(ctx, "walkthrough", "Book a Cleaning Walkthrough | Clean by Morning",
                 "Book a free 15-minute walkthrough for medical, dental or office cleaning in Brooklyn, Manhattan or Nassau County. Price in writing within 24 hours.",
@@ -580,14 +634,12 @@ def walkthrough_page(ctx):
 
 def faq_page(ctx):
     trail = [("index", "Home"), ("faq", "FAQ")]
-    body = f'''{crumbs(ctx, "FAQ")}
-{page_head(ctx, "Commercial cleaning questions", "Prices, schedules, keys and alarms, payment and contracts: the questions office managers ask before they sign.", "morning")}
+    body = f'''{page_head(ctx, "FAQ", "Commercial cleaning questions", "Prices, schedules, keys and alarms, payment and contracts: the questions to ask before you sign with any cleaner.", "morning")}
 {faq_table(FAQ, "Questions")}
-{photo_row(ctx, ["bridge", "rain", "windows"], "After hours in New York, when we work.")}
 {contact_field(ctx)}'''
     return page(ctx, "faq", "Commercial Cleaning FAQ | Clean by Morning",
                 "Answers about Clean by Morning's evening office and medical cleaning: prices, schedules, keys and alarms, payment and contracts.",
-                body, schema=[faq_schema(FAQ), crumbs_schema(ctx, trail)])
+                body, active="faq", schema=[faq_schema(FAQ), crumbs_schema(ctx, trail)])
 
 
 def owner_section(ctx):
@@ -595,24 +647,26 @@ def owner_section(ctx):
         return ""
     photo = ""
     if B["owner_photo"]:
-        photo = (f'<div class="head-photo"><img src="{ctx.asset("img/" + B["owner_photo"])}" alt="{E(B["owner_name"])}, owner of Clean by Morning" '
-                 f'width="800" height="1000" loading="lazy" decoding="async"></div>')
-    bio = f'<p>{E(B["owner_bio"])}</p>' if B["owner_bio"] else ""
-    return f'''<section class="section" id="owner"><div class="wrap page-head reveal"><div class="stack">
+        photo = (f'<figure class="ph owner-photo"><img src="{ctx.asset("img/" + B["owner_photo"])}" alt="{E(B["owner_name"])}, owner of Clean by Morning" '
+                 f'width="800" height="1000" loading="lazy" decoding="async"></figure>')
+    bio = f'<p class="lead">{E(B["owner_bio"])}</p>' if B["owner_bio"] else ""
+    return f'''<section class="g g-dawn section" id="owner"><div class="wrap split reveal"><div class="prose">
 <h2>{E(B["owner_name"])}, owner</h2>{bio}
 <p>Call or text me directly at <a class="num" href="tel:{B["phone_e164"]}">{E(B["phone_display"])}</a>.</p></div>{photo}</div></section>'''
 
 
 def about_page(ctx):
     trail = [("index", "Home"), ("about", "About")]
-    body = f'''{crumbs(ctx, "About")}
-{page_head(ctx, "One crew, one checklist", "Clean by Morning is an owner-operated cleaning company for medical practices and small offices in New York City and Nassau County.", "windows")}
-{photo_row(ctx, ["bridge", "rain", "morning"], "From lock-up to opening: the hours we work.")}
-<section class="section"><div class="wrap grid reveal"><div class="left6"><h2>Why we work this way</h2></div><div class="right5 stack">
+    body = f'''{page_head(ctx, "About", "One crew, one checklist", "Clean by Morning is an owner-operated cleaning company for medical practices and small offices in New York City and Nassau County.", "windows")}
+<section class="g g-day section"><div class="wrap split reveal"><div>{sec_head("Why we work this way")}</div><div class="prose">
 <p>The usual complaints about commercial cleaners are a different person every month, a checklist nobody follows, and an invoice that keeps changing. Clean by Morning is set up to avoid all three.</p>
 <p>The owner cleans or inspects every account. Every visit follows the same written checklist. Prices are fixed and billed once a month, and you can leave with 30 days' notice.</p>
 <p>We clean in the evening, after you close, so your patients and staff never see us, only the result.</p></div></div></section>
 {owner_section(ctx)}
+<section class="g g-night section"><div class="wrap">{sec_head("What you can count on")}<ul class="tiles reveal">
+<li>A written checklist for your space, agreed at the walkthrough</li><li>Photos of every room after each clean, if you want them</li>
+<li>Keys and alarm codes stored securely; the alarm set when we leave</li><li>One fixed monthly price, month to month</li></ul>
+<div class="photo-strip">{fig(ctx, "bridge")}{fig(ctx, "lamp")}{fig(ctx, "rain")}</div></div></section>
 {contact_field(ctx)}'''
     return page(ctx, "about", "About Clean by Morning | NYC Office Cleaning",
                 "Clean by Morning is an owner-operated evening cleaning company for medical practices and small offices in NYC and Nassau County.",
@@ -621,17 +675,15 @@ def about_page(ctx):
 
 def one_pager(ctx):
     proof = proof_lines() or ["Certificate of insurance sent on request once coverage is in place"]
-    sub = 'style="font-size:var(--step-statement)"'
-    body = f'''<section class="section" style="padding-top:48px"><div class="wrap stack">
-<h1 style="font-size:var(--step-head)">Capability statement</h1>
-<div class="grid"><div class="left6 stack">
-<p class="statement">{E(B["legal_name"])}: evening commercial cleaning for medical offices, dental practices, offices and gyms in Brooklyn, Manhattan and Nassau County.</p>
-<h2 {sub}>Services</h2><ul class="list">{"".join(f"<li>{E(s['name'])}</li>" for s in SERVICES)}</ul>
-<h2 {sub}>How we work</h2><ul class="list"><li>Owner-operated; the owner cleans or inspects every account</li><li>Written checklist per site; photos after each visit on request</li>
+    body = f'''<section class="g g-day section one-pager"><div class="wrap">
+<h1>Capability statement</h1><span class="horizon" aria-hidden="true"></span>
+<p class="lead">{E(B["legal_name"])}: evening commercial cleaning for medical offices, dental practices, offices and gyms in Brooklyn, Manhattan and Nassau County.</p>
+<div class="op-grid"><div><h2>Services</h2><ul class="checks">{"".join(f"<li>{E(s['name'])}</li>" for s in SERVICES)}</ul>
+<h2>How we work</h2><ul class="checks"><li>Owner-operated; the owner cleans or inspects every account</li><li>Written checklist per site; photos after each visit on request</li>
 <li>Color-coded microfiber and EPA-registered disinfectants</li><li>No handling of sharps or regulated medical waste</li><li>Keys and alarm codes stored securely</li></ul></div>
-<div class="right5 stack"><h2 {sub}>Commercial terms</h2><ul class="list"><li>Fixed monthly price, ACH autopay on the 1st</li><li>Month to month, 30 days' notice</li>
+<div><h2>Commercial terms</h2><ul class="checks"><li>Fixed monthly price, ACH autopay on the 1st</li><li>Month to month, 30 days' notice</li>
 <li>From ${PRICING["min_visit"]} per visit; about ${PRICING["hourly"]} per cleaning hour</li><li>NAICS 561720, Janitorial Services</li>{"".join(f"<li>{E(x)}</li>" for x in proof)}</ul>
-<h2 {sub}>Contact</h2><p>{E(B["email"])}<br><span class="num">{E(B["phone_display"])}</span><br>{E(B["domain"].replace("https://", ""))}</p></div></div>
+<h2>Contact</h2><p>{E(B["email"])}<br><span class="num">{E(B["phone_display"])}</span><br>{E(B["domain"].replace("https://", ""))}</p></div></div>
 </div></section>'''
     return page(ctx, "one-pager", "Clean by Morning Capability Statement", "Capability statement for Clean by Morning Office Cleaning.", body, noindex=True)
 
@@ -685,26 +737,24 @@ GUIDES = [
 def guide_page(ctx, g):
     key = "guides/" + g["slug"]
     trail = [("index", "Home"), ("guides", "Guides"), (key, g["title"])]
-    secs = "".join(f'<h2>{E(h)}</h2><ul>{"".join(f"<li>{E(x)}</li>" for x in items)}</ul>' for h, items in g["sections"])
+    secs = "".join(f'<h2>{E(h)}</h2><ul class="checks">{"".join(f"<li>{E(x)}</li>" for x in items)}</ul>' for h, items in g["sections"])
     schema = {"@context": "https://schema.org", "@type": "Article", "headline": g["title"], "description": g["meta"],
               "author": {"@type": "Organization", "name": B["name"]}, "publisher": {"@id": B["domain"] + "/#business"},
               "mainEntityOfPage": ctx.canonical(key), "image": B["domain"] + "/img/" + PHOTOS["windows"]["file"]}
-    body = f'''{crumbs(ctx, "Guides")}
-{page_head(ctx, g["title"], g["lead"], "windows", ("See prices", ctx.href("pricing")))}
-<section class="section"><div class="wrap"><article class="article reveal">{secs}
-<p>Want this checklist for your own office, priced? <a class="text-link" href="{ctx.href("walkthrough")}">Book a 15-minute walkthrough</a>.</p></article></div></section>
-{photo_row(ctx, ["bridge", "rain", "morning"], "After hours in New York, when we work.")}
+    others = [(o["title"], ctx.href("guides/" + o["slug"])) for o in GUIDES if o is not g]
+    body = f'''{page_head(ctx, "Guides", g["title"], g["lead"], "windows", ("See prices", ctx.href("pricing")))}
+<section class="g g-day section"><div class="wrap"><article class="article reveal">{secs}
+<p>Want this checklist for your own office, priced? <a href="{ctx.href("walkthrough")}">Book a 15-minute walkthrough</a>.</p></article></div></section>
+{link_band(ctx, "More guides", [("More guides", others), ("Services", [(s["name"], ctx.href("svc:" + s["key"])) for s in SERVICES[:3]])])}
 {contact_field(ctx)}'''
     return page(ctx, key, f'{g["title"]} | Clean by Morning', g["meta"], body, schema=[schema, crumbs_schema(ctx, trail)])
 
 
 def guides_index(ctx):
     trail = [("index", "Home"), ("guides", "Guides")]
-    items = "".join(f'<li><a href="{ctx.href("guides/" + g["slug"])}">{E(g["title"])}</a><p>{E(g["meta"])}</p></li>' for g in GUIDES)
-    body = f'''{crumbs(ctx, "Guides")}
-{page_head(ctx, "Guides for office managers", "Plain answers about commercial cleaning in New York: what it costs, what it should include, and how often you need it.", "morning")}
-<section class="section"><div class="wrap"><ul class="guide-list reveal">{items}</ul></div></section>
-{photo_row(ctx, ["bridge", "rain", "windows"], "After hours in New York, when we work.")}
+    items = "".join(f'<li><a href="{ctx.href("guides/" + g["slug"])}"><span class="svc-name">{E(g["title"])}</span><span class="svc-line">{E(g["meta"])}</span><span class="svc-price">Read</span></a></li>' for g in GUIDES)
+    body = f'''{page_head(ctx, "Guides", "Guides for office managers", "Plain answers about commercial cleaning in New York: what it costs, what it should include, and how often you need it.", "morning")}
+<section class="g g-day section"><div class="wrap"><ul class="svc-list reveal">{items}</ul></div></section>
 {contact_field(ctx)}'''
     return page(ctx, "guides", "Commercial Cleaning Guides | Clean by Morning",
                 "Guides for NYC and Long Island office managers: cleaning costs, medical office checklists and how often to clean a dental office.",
@@ -712,8 +762,8 @@ def guides_index(ctx):
 
 
 def not_found(ctx):
-    body = f'''<section class="wrap page-head"><h1>Page not found</h1><p class="statement">That page doesn't exist.</p>
-<div class="hero-cta" style="justify-content:flex-start"><a class="btn btn-accent" href="{ctx.href("walkthrough")}">Book a walkthrough</a></div></section>'''
+    body = f'''<section class="g g-dusk head"><div class="wrap"><h1>Page not found</h1><span class="horizon" aria-hidden="true"></span>
+<p class="lead">That page doesn't exist. Try the home page or book a walkthrough.</p>{ctas(ctx, ("Home", ctx.href("index")))}</div></section>'''
     return page(ctx, "404", "Page not found | Clean by Morning", "Page not found.", body, noindex=True)
 
 

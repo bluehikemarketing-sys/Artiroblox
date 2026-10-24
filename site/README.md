@@ -2,6 +2,8 @@
 
 The website for Clean by Morning, evening commercial cleaning in Brooklyn, Manhattan and Nassau County. It's a static site with no dependencies: `build.py` generates every page.
 
+Design: every page reads as one night. It opens at dusk in the brand cobalt, gets darker through the clean (the "One night at your office" timeline on the home page), and ends in morning white and sun yellow. Section colors are flat steps defined in `static/styles.css` (`.g-dusk` through `.g-day`).
+
 ## Edit and build
 
 1. Open `site/build.py` and fill in the settings at the top:
