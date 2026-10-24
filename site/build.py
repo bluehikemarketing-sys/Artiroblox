@@ -116,7 +116,7 @@ SERVICES = [
                   "Color-coded microfiber and EPA-registered disinfectants", "We never handle sharps, amalgam or regulated waste"],
      "faq": [("Do you disinfect the dental chairs?", "Chairside surfaces between patients stay with your clinical team. At night we clean the operatory floors, counters outside the clinical zone and every touch point."),
              ("Can you clean after late appointments?", "Yes. We schedule around your last appointment, including late evenings."),
-             ("How many nights a week do dental offices need?", "Most practices book three to five nights. The estimator shows the price for each.")]},
+             ("How many nights a week do dental offices need?", "Most practices book three to five nights, depending on patient volume and how many operatories they run.")]},
     {"key": "office", "slug": "office-cleaning", "name": "Office cleaning", "kind": "office",
      "h1": "Office cleaning in NYC", "title": "Office Cleaning NYC & Long Island | Clean by Morning",
      "lead": "Evening office cleaning for small and mid-size offices: desks, kitchens, restrooms and floors, ready before your team arrives.",
@@ -142,10 +142,10 @@ SERVICES = [
      "lead": "A one-time clean after a build-out or renovation, so a new office or practice can open: dust, debris, windows, fixtures and floors.",
      "nightly": ["Construction dust removed from every surface, ledge and vent", "Interior windows, frames and sills", "Fixtures, cabinets and drawers inside and out",
                  "Floors vacuumed, scrubbed and mopped", "Stickers, paint spots and adhesive removed where safe", "Final wipe-down so the space is move-in ready"],
-     "clinical": [f"Priced per square foot, from ${postcon_price(1000):,} for small spaces", f"{int(PRICING['deposit'] * 100)}% deposit to book, the rest when the space passes your walkthrough",
+     "clinical": ["Quoted after a walkthrough of the finished space", "Deposit to book, the rest when the space passes your walkthrough",
                   "We coordinate with your contractor's punch list", "Medical and dental build-outs cleaned to opening standard"],
      "faq": [("When should post-construction cleaning happen?", "After trades finish and before furniture or equipment moves in. A second light clean after move-in is often worth it."),
-             ("How is it priced?", f"By square foot, about ${PRICING['postcon_per_sqft']:.2f} per square foot with a ${PRICING['postcon_min']} minimum, confirmed at the walkthrough."),
+             ("How is it priced?", "By the size of the space and how much construction dust is left. We quote after a walkthrough."),
              ("Do you remove construction debris?", "We remove dust and small debris. Large debris and dumpsters stay with your contractor.")]},
 ]
 SVC = {s["key"]: s for s in SERVICES}
@@ -172,11 +172,11 @@ AREAS = [
 ]
 
 FAQ = [
-    ("How much does office cleaning cost?", f"We charge by cleaning time: about ${PRICING['hourly']} per hour, with a ${PRICING['min_visit']} minimum per visit. A 2,000 square foot medical office cleaned three nights a week is about ${monthly_price('medical', 2000, 2, 3):,} a month. The estimator shows your number."),
     ("When do you clean?", "After you close, usually between 6 PM and 2 AM. You pick the nights, and we're done before you open."),
     ("Who does the cleaning?", "Clean by Morning is owner-operated. The owner cleans or inspects every account, so you have one person responsible."),
     ("Do you clean medical and dental offices?", "Yes, they're our focus. We use color-coded microfiber and EPA-registered disinfectants, and we never handle sharps or regulated medical waste."),
     ("How do I pay?", "Monthly, by ACH autopay on the 1st. The first month is paid before the first clean. One-time jobs take a 50% deposit."),
+    ("How is pricing set?", "Every space is different, so we price after a free 15-minute walkthrough: the size, the number of rooms and restrooms, and how many nights a week. You get a fixed monthly price in writing within 24 hours."),
     ("Is there a long contract?", "No. It's month to month. Either side can end it with 30 days' notice."),
     ("Do you bring supplies?", "Yes. Restroom paper, soap and liners can be restocked at cost, or you can supply your own."),
     ("How do keys and alarms work?", "You give us a key or fob and an alarm code. We store them securely, arm the alarm when we leave, and text you when we're done."),
@@ -250,7 +250,7 @@ def business_schema():
          "name": B["name"], "legalName": B["legal_name"], "url": B["domain"] + "/", "telephone": B["phone_e164"], "email": B["email"],
          "description": "Evening commercial cleaning for medical offices, dental practices, offices and gyms in Brooklyn, Manhattan and Nassau County.",
          "areaServed": [{"@type": "City", "name": "Brooklyn, NY"}, {"@type": "City", "name": "Manhattan, NY"}, {"@type": "AdministrativeArea", "name": "Nassau County, NY"}],
-         "priceRange": "$$", "openingHours": B["hours_schema"], "image": B["domain"] + "/img/" + PHOTOS["bridge"]["file"], "sameAs": B["same_as"],
+         "openingHours": B["hours_schema"], "image": B["domain"] + "/img/" + PHOTOS["bridge"]["file"], "sameAs": B["same_as"],
          "logo": B["domain"] + "/icon-512.png",
          "makesOffer": [{"@type": "Offer", "itemOffered": {"@type": "Service", "name": s["name"]}} for s in SERVICES]}
     if B["owner_name"]:
@@ -326,66 +326,21 @@ def sec_head(h2, lead=""):
     return f'<div class="sec-head"><h2>{E(h2)}</h2>{p}</div>'
 
 
-def night_sheet(ctx):
-    rows = []
-    for t, ap, h, txt, photo, g in NIGHT:
-        ph = fig(ctx, photo, "row-photo", tint=(g != "g-day")) if photo else ""
-        rows.append(f'''<li class="g {g} row"><div class="wrap row-grid reveal"><p class="time num">{t}<span>{ap}</span></p>
-<div class="row-copy"><h3>{E(h)}</h3><p>{E(txt)}</p></div>{ph}</div></li>''')
-    return f'''<section class="sheet" aria-labelledby="night-h">
-<div class="g g-dusk sheet-intro"><div class="wrap">{sec_head("One night at your office", "A typical evening at a 2,000 square foot practice, cleaned three nights a week.").replace("<h2>", '<h2 id="night-h">', 1)}</div></div>
-<ol class="rows">{"".join(rows)}</ol></section>'''
-
-
 def services_list(ctx, heading="What we clean", lead="Five kinds of space. Each gets its own written checklist.", exclude=None):
     items = []
     for s in SERVICES:
         if s is exclude:
             continue
-        price = f"from ${postcon_price(1000)}" if s["kind"] == "postcon" else f"from ${PRICING['min_visit']} a visit"
         items.append(f'<li><a href="{ctx.href("svc:" + s["key"])}"><span class="svc-name">{E(s["name"])}</span>'
-                     f'<span class="svc-line">{E(SHORT[s["key"]])}</span><span class="svc-price num">{price}</span></a></li>')
+                     f'<span class="svc-line">{E(SHORT[s["key"]])}</span></a></li>')
     return f'<section class="g g-day section" id="services"><div class="wrap">{sec_head(heading, lead)}<ul class="svc-list reveal">{"".join(items)}</ul></div></section>'
-
-
-def price_band(ctx, heading_html, note, preset="medical", anchor="pricing"):
-    return f'''<section class="g g-dawn section" id="{anchor}"><div class="wrap price-grid">
-<div class="price-copy"><h2>{heading_html}</h2><p>{E(note)}</p>{ctas(ctx, ("Full price list", ctx.href("pricing")), on_light=True)}</div>
-{estimator(preset)}</div></section>'''
-
-
-def estimator(preset="medical"):
-    kinds = [("medical", "Medical"), ("dental", "Dental"), ("office", "Office"), ("gym", "Gym or studio"), ("postcon", "Post-construction, one time")]
-    chips = "".join(f'<label class="chip"><input type="radio" name="kind" value="{k}"{" checked" if k == preset else ""}><span>{n}</span></label>' for k, n in kinds)
-    nights = "".join(f'<label class="chip"><input type="radio" name="nights" value="{n}"{" checked" if n == 3 else ""}><span>{n}</span></label>' for n in range(1, 8))
-    rest = "".join(f'<option value="{n}"{" selected" if n == 2 else ""}>{n}</option>' for n in range(0, 9))
-    if preset == "postcon":
-        figure, detail = postcon_price(2000), "One-time clean, 2,000 sq ft."
-    else:
-        figure, detail = monthly_price(preset, 2000, 2, 3), f"About ${visit_price(preset, 2000, 2)} a visit, 3 nights a week."
-    return f'''<form class="estimator" data-ui data-estimator novalidate aria-label="Cleaning price estimator">
-<div class="est-fields">
-<h3>Estimate your price</h3>
-<fieldset class="field"><legend>Type of space</legend><div class="chips">{chips}</div></fieldset>
-<div class="field"><label for="e-sqft">Square feet: <span data-sqft-out class="num">2,000</span></label><input id="e-sqft" name="sqft" type="range" min="500" max="15000" step="250" value="2000"></div>
-<fieldset class="field" data-recurring><legend>Nights a week</legend><div class="chips">{nights}</div></fieldset>
-<div class="field" data-recurring><label for="e-rest">Restrooms</label><select id="e-rest" name="restrooms">{rest}</select></div>
-</div>
-<div class="est-result" aria-live="polite">
-<p class="small" data-est-label>{"One-time price" if preset == "postcon" else "Estimated monthly price"}</p>
-<p class="est-figure num" data-est-figure>${figure:,}</p>
-<p data-est-detail>{detail}</p>
-<p class="small">An estimate before tax. We confirm the price after a 15-minute walkthrough.</p>
-<a class="btn btn-sun" data-est-cta href="#">Book a walkthrough</a>
-</div>
-</form>'''
 
 
 def areas_band(ctx, heading="Where we clean"):
     photos = {"brooklyn": "bridge", "manhattan": "windows", "nassau-county": "morning"}
     cols = "".join(f'''<div class="area reveal">{fig(ctx, photos[a["slug"]])}<h3><a href="{ctx.href("area:" + a["slug"])}">{E(a["name"])}</a></h3>
 <p>{E(", ".join(a["hoods"][:5]))} and more.</p></div>''' for a in AREAS)
-    return f'<section class="g g-night section" id="areas"><div class="wrap">{sec_head(heading, "We drive to every job, so the outer neighborhoods cost the same as the ones by the bridges.")}<div class="area-cols">{cols}</div></div></section>'
+    return f'<section class="g g-night section" id="areas"><div class="wrap">{sec_head(heading, "We drive to every job, from Bay Ridge to Great Neck.")}<div class="area-cols">{cols}</div></div></section>'
 
 
 def faq_table(items, heading="Questions"):
@@ -397,7 +352,7 @@ def faq_table(items, heading="Questions"):
 def contact_field(ctx):
     user, dom = B["email"].split("@")
     return f'''<section class="g g-sun section contact" id="contact"><div class="wrap contact-grid">
-<div class="contact-copy"><h2>Get a price by morning</h2><p class="lead">Email or text your square footage and how many nights a week. We reply with a price by the next morning.</p></div>
+<div class="contact-copy"><h2>Book a walkthrough</h2><p class="lead">Tell us about your space and the nights you need. We'll set up a free 15-minute walkthrough at a time that suits you.</p></div>
 <div class="contact-ways"><a class="mail-line" href="mailto:{B["email"]}?subject=Cleaning%20quote">{E(user)}@<wbr>{E(dom)}</a>
 <a class="phone num" href="tel:{B["phone_e164"]}">{E(B["phone_display"])}</a>
 {ctas(ctx, ("Capability statement", ctx.href("one-pager")), on_light=True)}</div>
@@ -412,7 +367,7 @@ def link_band(ctx, heading, groups):
 # ---------------------------------------------------------------------------
 # Shell
 # ---------------------------------------------------------------------------
-NAV = [("services", "Services"), ("areas", "Areas"), ("pricing", "Pricing"), ("faq", "FAQ")]
+NAV = [("services", "Services"), ("areas", "Areas"), ("faq", "FAQ"), ("about", "About")]
 
 
 def nav_href(ctx, k):
@@ -432,7 +387,7 @@ def header(ctx, active):
     links = "".join(f'<a href="{nav_href(ctx, k)}"{cur if k == active else ""}>{n}</a>' for k, n in NAV)
     menu = "".join(f'<a href="{ctx.href("svc:" + s["key"])}">{E(s["name"])}</a>' for s in SERVICES)
     menu += "".join(f'<a href="{ctx.href("area:" + a["slug"])}">{E(a["name"])}</a>' for a in AREAS)
-    menu += (f'<a href="{ctx.href("pricing")}">Pricing</a><a href="{ctx.href("faq")}">FAQ</a><a href="{ctx.href("guides")}">Guides</a>'
+    menu += (f'<a href="{ctx.href("faq")}">FAQ</a><a href="{ctx.href("guides")}">Guides</a>'
              f'<a href="{ctx.href("about")}">About</a><a href="tel:{B["phone_e164"]}">Call {E(B["phone_display"])}</a>')
     bar = ""
     if ctx.preview:
@@ -451,7 +406,7 @@ def footer(ctx):
         return f'<nav class="foot-col" aria-label="{E(title)}"><h2>{E(title)}</h2>{"".join(f"<a href={chr(34)}{h}{chr(34)}>{E(n)}</a>" for n, h in links)}</nav>'
     svc = [(s["name"], ctx.href("svc:" + s["key"])) for s in SERVICES]
     areas = [(a["name"], ctx.href("area:" + a["slug"])) for a in AREAS] + [(u.split("//")[-1].split("/")[0], u) for u in B["same_as"]]
-    company = [("Pricing", ctx.href("pricing")), ("FAQ", ctx.href("faq")), ("Guides", ctx.href("guides")), ("About", ctx.href("about")),
+    company = [("FAQ", ctx.href("faq")), ("Guides", ctx.href("guides")), ("About", ctx.href("about")),
                ("Book a walkthrough", ctx.href("walkthrough")), ("Capability statement", ctx.href("one-pager"))]
     return f'''<footer class="g g-night site-footer"><div class="wrap">
 <div class="foot-grid"><div class="foot-brand">{wordmark(ctx)}<p>Evening cleaning for medical, dental and office spaces in Brooklyn, Manhattan and Nassau County.</p>
@@ -473,7 +428,7 @@ def page(ctx, key, title, desc, body, active=None, schema=(), noindex=False, wra
     if B["ga4_id"] and not ctx.preview:
         ga = (f'<script async src="https://www.googletagmanager.com/gtag/js?id={B["ga4_id"]}"></script>'
               f'<script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments)}}gtag("js",new Date());gtag("config","{B["ga4_id"]}");</script>')
-    cfg = {"pricing": PRICING, "email": B["email"], "phone": B["phone_e164"], "phoneDisplay": B["phone_display"],
+    cfg = {"email": B["email"], "phone": B["phone_e164"], "phoneDisplay": B["phone_display"],
            "formEndpoint": B["form_endpoint"], "walkthrough": ctx.href("walkthrough")}
     head = f'''<title>{E(title)}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -523,17 +478,18 @@ def home(ctx, wrapper=True):
     body = f'''<section class="g g-dusk hero"><div class="wrap hero-grid">
 <div class="hero-copy"><h1>Medical offices, clean by morning</h1><span class="horizon" aria-hidden="true"></span>
 <p class="lead">Evening cleaning for medical, dental and office spaces in Brooklyn, Manhattan and Nassau County. You lock up at 6. We're done before you open.</p>
-{ctas(ctx, ("See prices", "#pricing"))}{proof_html}{clients}</div>
-<figure class="ph tint hero-photo shutter">{ctx.img("windows", lazy=False)}<figcaption class="clock" data-clock>We clean between 6 PM and 2 AM, after you close.</figcaption></figure>
+{ctas(ctx, ("Our services", "#services"))}{proof_html}{clients}</div>
+<figure class="ph tint hero-photo shutter">{ctx.img("windows", lazy=False)}</figure>
 </div></section>
-{night_sheet(ctx)}
 {services_list(ctx)}
-{price_band(ctx, f'From <span class="price-block num">${PRICING["min_visit"]}</span> a night', f"About ${PRICING['hourly']} per cleaning hour, with supplies included. Monthly autopay, month to month, 30 days' notice to cancel.")}
+<section class="g g-night section"><div class="wrap">{sec_head("How we work", "Owner-operated, so one person is responsible for your office.")}<ul class="tiles reveal">
+<li>The owner cleans or inspects every account</li><li>A written checklist for your space, agreed at the walkthrough</li>
+<li>Photos of every room after each clean, if you want them</li><li>Keys and alarm codes stored securely; the alarm set when we leave</li></ul></div></section>
 {areas_band(ctx)}
 {faq_table(FAQ[:6])}
 {contact_field(ctx)}'''
     return page(ctx, "index", "Medical & Office Cleaning NYC and Long Island | Clean by Morning",
-                f"Evening cleaning for medical, dental and office spaces in Brooklyn, Manhattan and Nassau County. From ${PRICING['min_visit']} a visit, month to month. Book a walkthrough.",
+                "Evening cleaning for medical, dental and office spaces in Brooklyn, Manhattan and Nassau County. Owner-operated, month to month. Book a free walkthrough.",
                 body, schema=[business_schema(), faq_schema(FAQ[:6])], wrapper=wrapper)
 
 
@@ -541,23 +497,14 @@ def service_page(ctx, s):
     trail = [("index", "Home"), ("svc:" + s["key"], s["name"])]
     nightly = "".join(f"<li>{E(x)}</li>" for x in s["nightly"])
     clinical = "".join(f"<li>{E(x)}</li>" for x in s["clinical"])
-    if s["kind"] == "postcon":
-        start = postcon_price(1000)
-        price_line = f'From <span class="price-block num">${start}</span>, one time'
-        price_note = f"About ${PRICING['postcon_per_sqft']:.2f} per square foot, {int(PRICING['deposit'] * 100)}% deposit to book, the rest on completion."
-    else:
-        start = PRICING["min_visit"]
-        price_line = f'From <span class="price-block num">${start}</span> a night'
-        price_note = f"About ${PRICING['hourly']} per cleaning hour, supplies included, billed monthly by autopay."
     schema = {"@context": "https://schema.org", "@type": "Service", "name": s["h1"], "serviceType": s["name"], "provider": {"@id": B["domain"] + "/#business"},
               "areaServed": ["Brooklyn, NY", "Manhattan, NY", "Nassau County, NY"],
-              "offers": {"@type": "Offer", "priceCurrency": "USD", "price": str(start)}, "url": ctx.canonical("svc:" + s["key"])}
+              "url": ctx.canonical("svc:" + s["key"])}
     photo = {"medical": "windows", "dental": "morning", "office": "bridge", "gym": "rain", "postcon": "morning"}[s["key"]]
     second = "Every visit" if s["kind"] != "postcon" else "What we clean"
-    body = f'''{page_head(ctx, s["name"], s["h1"], s["lead"], photo, ("Estimate the price", "#estimate"))}
+    body = f'''{page_head(ctx, s["name"], s["h1"], s["lead"], photo, ("Questions", "#faq"))}
 <section class="g g-day section"><div class="wrap split reveal"><div>{sec_head(second, "The checklist we start from. We adjust it to your space at the walkthrough.")}</div><ul class="checks big">{nightly}</ul></div></section>
 <section class="g g-night section"><div class="wrap">{sec_head("How we work")}<ul class="tiles reveal">{clinical}</ul></div></section>
-{price_band(ctx, price_line, price_note, s["kind"], "estimate")}
 {faq_table(s["faq"], "Questions about " + s["name"].lower())}
 {link_band(ctx, "Related", [("Where we do it", [(f'{s["name"]} in {a["name"]}', ctx.href("area:" + a["slug"])) for a in AREAS]),
                             ("Other services", [(o["name"], ctx.href("svc:" + o["key"])) for o in SERVICES if o is not s])])}
@@ -573,39 +520,14 @@ def area_page(ctx, a):
     schema = business_schema() | {"areaServed": {"@type": "Place", "name": a["name"] + ", NY"}}
     photo = "morning" if a["slug"] == "nassau-county" else ("bridge" if a["slug"] == "brooklyn" else "windows")
     trio = "".join(fig(ctx, k) for k in ("rain", "lamp", "bridge", "windows", "morning") if k != photo)
-    body = f'''{page_head(ctx, a["name"], a["h1"], a["lead"], photo, ("See prices", ctx.href("pricing")))}
+    body = f'''{page_head(ctx, a["name"], a["h1"], a["lead"], photo, ("Our services", "#services"))}
 <section class="g g-day section"><div class="wrap split reveal"><div>{sec_head("Cleaning in " + a["name"])}</div><div class="prose">{paras}</div></div></section>
 <section class="g g-night section"><div class="wrap"><p class="names reveal">In {E(a["name"])} we clean in {E(hoods)}.</p><div class="photo-strip">{trio}</div></div></section>
-{services_list(ctx, "Services in " + a["name"], "The same checklist and the same monthly pricing in every neighborhood.")}
-{link_band(ctx, "Other areas", [("We also serve", [(o["name"], ctx.href("area:" + o["slug"])) for o in AREAS if o is not a]), ("Prices", [("Price list", ctx.href("pricing")), ("Estimate yours", ctx.href("pricing", "#estimate"))])])}
+{services_list(ctx, "Services in " + a["name"], "The same checklist and the same standards in every neighborhood.")}
+{link_band(ctx, "Other areas", [("We also serve", [(o["name"], ctx.href("area:" + o["slug"])) for o in AREAS if o is not a]), ("Learn more", [("FAQ", ctx.href("faq")), ("Guides", ctx.href("guides"))])])}
 {contact_field(ctx)}'''
     return page(ctx, "area:" + a["slug"], f'Office & Medical Cleaning {a["name"]}, NY | Clean by Morning', a["lead"][:155], body, active="areas",
                 schema=[schema, crumbs_schema(ctx, trail)])
-
-
-def pricing_page(ctx):
-    trail = [("index", "Home"), ("pricing", "Pricing")]
-    sizes = [1000, 2000, 3500, 5000, 8000]
-    rows = []
-    for k, n in [("medical", "Medical, 3 nights a week"), ("dental", "Dental, 3 nights a week"), ("office", "Office, 3 nights a week"), ("gym", "Gym or studio, 5 nights a week")]:
-        nights = 5 if k == "gym" else 3
-        cells = "".join(f'<td class="n">${monthly_price(k, sz, 1 if sz < 2000 else 2 if sz < 5000 else 4, nights):,}</td>' for sz in sizes)
-        rows.append(f'<tr><th scope="row">{n}</th>{cells}</tr>')
-    rows.append('<tr><th scope="row">Post-construction, one time</th>' + "".join(f'<td class="n">${postcon_price(sz):,}</td>' for sz in sizes) + "</tr>")
-    head = "".join(f"<th>{sz:,} sq ft</th>" for sz in sizes)
-    body = f'''{page_head(ctx, "Pricing", "Office cleaning prices", "Monthly prices for evening cleaning in Brooklyn, Manhattan and Nassau County, before tax. Billed once a month by autopay.", "rain", ("Estimate yours", "#estimate"))}
-<section class="g g-day section"><div class="wrap">{sec_head("Prices by size", "Monthly, before tax, for a typical number of restrooms at each size.")}
-<div class="table-scroll reveal"><table class="price-table"><thead><tr><th>Space and schedule</th>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>
-<p class="note">Monthly figures assume {PRICING["weeks_per_month"]} weeks a month and 1–4 restrooms by size. New York sales tax applies to commercial cleaning. Your exact price comes after a 15-minute walkthrough.</p>
-</div></section>
-{price_band(ctx, "Your price, in a minute", f"Pick your space, size and nights. The same model as the table: about ${PRICING['hourly']} per cleaning hour with a ${PRICING['min_visit']} minimum a visit.", "medical", "estimate")}
-<section class="g g-night section"><div class="wrap">{sec_head("How billing works")}<ul class="tiles reveal">
-<li>One monthly price, billed on the 1st by ACH autopay</li><li>First month paid before the first clean</li><li>Month to month, with 30 days' notice to cancel</li>
-<li>One-time jobs: {int(PRICING["deposit"] * 100)}% deposit to book, the rest on completion</li></ul></div></section>
-{contact_field(ctx)}'''
-    return page(ctx, "pricing", "Office Cleaning Prices NYC & Long Island | Clean by Morning",
-                f"Monthly prices for medical, dental, office and gym cleaning in Brooklyn, Manhattan and Nassau County. From ${PRICING['min_visit']} a visit.",
-                body, active="pricing", schema=[crumbs_schema(ctx, trail)])
 
 
 def walkthrough_page(ctx):
@@ -634,11 +556,11 @@ def walkthrough_page(ctx):
 
 def faq_page(ctx):
     trail = [("index", "Home"), ("faq", "FAQ")]
-    body = f'''{page_head(ctx, "FAQ", "Commercial cleaning questions", "Prices, schedules, keys and alarms, payment and contracts: the questions to ask before you sign with any cleaner.", "morning")}
+    body = f'''{page_head(ctx, "FAQ", "Commercial cleaning questions", "Schedules, keys and alarms, payment and contracts: the questions to ask before you sign with any cleaner.", "morning")}
 {faq_table(FAQ, "Questions")}
 {contact_field(ctx)}'''
     return page(ctx, "faq", "Commercial Cleaning FAQ | Clean by Morning",
-                "Answers about Clean by Morning's evening office and medical cleaning: prices, schedules, keys and alarms, payment and contracts.",
+                "Answers about Clean by Morning's evening office and medical cleaning: schedules, keys and alarms, payment and contracts.",
                 body, active="faq", schema=[faq_schema(FAQ), crumbs_schema(ctx, trail)])
 
 
@@ -682,25 +604,21 @@ def one_pager(ctx):
 <h2>How we work</h2><ul class="checks"><li>Owner-operated; the owner cleans or inspects every account</li><li>Written checklist per site; photos after each visit on request</li>
 <li>Color-coded microfiber and EPA-registered disinfectants</li><li>No handling of sharps or regulated medical waste</li><li>Keys and alarm codes stored securely</li></ul></div>
 <div><h2>Commercial terms</h2><ul class="checks"><li>Fixed monthly price, ACH autopay on the 1st</li><li>Month to month, 30 days' notice</li>
-<li>From ${PRICING["min_visit"]} per visit; about ${PRICING["hourly"]} per cleaning hour</li><li>NAICS 561720, Janitorial Services</li>{"".join(f"<li>{E(x)}</li>" for x in proof)}</ul>
+<li>NAICS 561720, Janitorial Services</li>{"".join(f"<li>{E(x)}</li>" for x in proof)}</ul>
 <h2>Contact</h2><p>{E(B["email"])}<br><span class="num">{E(B["phone_display"])}</span><br>{E(B["domain"].replace("https://", ""))}</p></div></div>
 </div></section>'''
     return page(ctx, "one-pager", "Clean by Morning Capability Statement", "Capability statement for Clean by Morning Office Cleaning.", body, noindex=True)
 
 
 GUIDES = [
-    {"slug": "office-cleaning-cost-nyc", "title": "How much does office cleaning cost in NYC?",
-     "meta": "What office and medical cleaning costs in Brooklyn, Manhattan and Nassau County, what changes the price, and worked examples by size.",
-     "lead": "Most commercial cleaning in New York is priced by the hours it takes, multiplied by how many nights a week you need it. Here's how that works, with our own prices as examples.",
+    {"slug": "office-cleaning-cost-nyc", "title": "What affects the cost of office cleaning in NYC",
+     "meta": "What changes the cost of office and medical cleaning in Brooklyn, Manhattan and Nassau County, and what to ask before you sign.",
+     "lead": "Most commercial cleaning in New York is priced by the hours it takes, multiplied by how many nights a week you need it. These are the things that move the number.",
      "sections": [
          ("What sets the price", ["Square footage: a routine office cleans at roughly 2,000–3,000 square feet an hour; medical and dental spaces take longer because every room is disinfected.",
                                   "Nights a week: most offices book two to five; gyms often book five to seven.",
                                   "Restrooms: each one adds time every visit.",
                                   "Building rules: Manhattan buildings often limit service hours and require a certificate of insurance, which can affect scheduling."]),
-         ("Worked examples (Clean by Morning prices)", [f"1,000 sq ft office, 3 nights a week: about ${monthly_price('office', 1000, 1, 3):,} a month",
-                                                       f"2,000 sq ft medical office, 3 nights a week: about ${monthly_price('medical', 2000, 2, 3):,} a month",
-                                                       f"3,500 sq ft dental office, 5 nights a week: about ${monthly_price('dental', 3500, 2, 5):,} a month",
-                                                       f"5,000 sq ft office, 3 nights a week: about ${monthly_price('office', 5000, 4, 3):,} a month"]),
          ("Sales tax", ["Commercial cleaning is generally subject to New York sales tax. The rate depends on where the work is done: 8.875% in New York City and 8.625% in Nassau County. Ask any cleaner whether their quote includes it."]),
          ("Questions to ask any cleaning company", ["Is the price fixed monthly, or does it change with hours?", "Is there a contract term, and how much notice do I need to cancel?",
                                                    "Can you send a certificate of insurance before you start?", "Who will clean my office, and will it be the same person each night?"]),
@@ -728,8 +646,6 @@ GUIDES = [
          ("What the cleaning crew does", ["Operatory floors, counters outside the clinical zone, door handles and switches", "Sterilization-area floors and sinks",
                                           "Reception, restrooms, break room and trash"]),
          ("What stays with your clinical team", ["Chairside surfaces and equipment between patients", "Sharps, amalgam and regulated waste, through your licensed hauler"]),
-         ("Pricing it", [f"A 2,000 sq ft practice cleaned four nights a week is about ${monthly_price('dental', 2000, 2, 4):,} a month at our rates.",
-                         "The estimator on our pricing page shows other sizes and schedules."]),
      ]},
 ]
 
@@ -742,9 +658,9 @@ def guide_page(ctx, g):
               "author": {"@type": "Organization", "name": B["name"]}, "publisher": {"@id": B["domain"] + "/#business"},
               "mainEntityOfPage": ctx.canonical(key), "image": B["domain"] + "/img/" + PHOTOS["windows"]["file"]}
     others = [(o["title"], ctx.href("guides/" + o["slug"])) for o in GUIDES if o is not g]
-    body = f'''{page_head(ctx, "Guides", g["title"], g["lead"], "windows", ("See prices", ctx.href("pricing")))}
+    body = f'''{page_head(ctx, "Guides", g["title"], g["lead"], "windows", ("Our services", ctx.href("index", "#services")))}
 <section class="g g-day section"><div class="wrap"><article class="article reveal">{secs}
-<p>Want this checklist for your own office, priced? <a href="{ctx.href("walkthrough")}">Book a 15-minute walkthrough</a>.</p></article></div></section>
+<p>Want this checklist for your own office? <a href="{ctx.href("walkthrough")}">Book a 15-minute walkthrough</a>.</p></article></div></section>
 {link_band(ctx, "More guides", [("More guides", others), ("Services", [(s["name"], ctx.href("svc:" + s["key"])) for s in SERVICES[:3]])])}
 {contact_field(ctx)}'''
     return page(ctx, key, f'{g["title"]} | Clean by Morning', g["meta"], body, schema=[schema, crumbs_schema(ctx, trail)])
@@ -752,7 +668,7 @@ def guide_page(ctx, g):
 
 def guides_index(ctx):
     trail = [("index", "Home"), ("guides", "Guides")]
-    items = "".join(f'<li><a href="{ctx.href("guides/" + g["slug"])}"><span class="svc-name">{E(g["title"])}</span><span class="svc-line">{E(g["meta"])}</span><span class="svc-price">Read</span></a></li>' for g in GUIDES)
+    items = "".join(f'<li><a href="{ctx.href("guides/" + g["slug"])}"><span class="svc-name">{E(g["title"])}</span><span class="svc-line">{E(g["meta"])}</span></a></li>' for g in GUIDES)
     body = f'''{page_head(ctx, "Guides", "Guides for office managers", "Plain answers about commercial cleaning in New York: what it costs, what it should include, and how often you need it.", "morning")}
 <section class="g g-day section"><div class="wrap"><ul class="svc-list reveal">{items}</ul></div></section>
 {contact_field(ctx)}'''
@@ -771,7 +687,7 @@ FAVICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect wid
 
 
 def all_pages(ctx):
-    pages = {"index": home(ctx), "pricing": pricing_page(ctx), "walkthrough": walkthrough_page(ctx), "faq": faq_page(ctx),
+    pages = {"index": home(ctx), "walkthrough": walkthrough_page(ctx), "faq": faq_page(ctx),
              "about": about_page(ctx), "one-pager": one_pager(ctx), "guides": guides_index(ctx), "404": not_found(ctx)}
     for g in GUIDES:
         pages["guides/" + g["slug"]] = guide_page(ctx, g)

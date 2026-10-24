@@ -2,14 +2,14 @@
 
 The website for Clean by Morning, evening commercial cleaning in Brooklyn, Manhattan and Nassau County. It's a static site with no dependencies: `build.py` generates every page.
 
-Design: every page reads as one night. It opens at dusk in the brand cobalt, gets darker through the clean (the "One night at your office" timeline on the home page), and ends in morning white and sun yellow. Section colors are flat steps defined in `static/styles.css` (`.g-dusk` through `.g-day`).
+Design: pages open at dusk in the brand cobalt, move through night blues and end in morning white and sun yellow. No prices are shown anywhere on the site; every quote comes after a walkthrough. Section colors are flat steps defined in `static/styles.css` (`.g-dusk` through `.g-day`).
 
 ## Edit and build
 
 1. Open `site/build.py` and fill in the settings at the top:
    - `B`: phone, email, form service URL (`form_endpoint`, e.g. Formspree), Google Analytics id, profile links (`same_as`). Everything marked `PLACEHOLDER` must be replaced.
    - `PROOF`: insurance, bond, workers' comp, Google reviews, client names. Each only appears on the site once it's true.
-   - `PRICING`: hourly rate, minimum per visit, cleaning speed by space type, post-construction rate. One model drives the estimator, the price lines, the pricing table and the guides.
+   - `PRICING`: your internal rate model for quoting. It is not shown on the site.
 2. Run `python3 site/build.py`.
 
 Output: `site/public/` is the live site to deploy. `site/preview/` is a flat local preview and is not committed.
@@ -38,11 +38,11 @@ To update later: run `python3 site/build.py`, then upload the changed files (or 
 
 | URL | Page |
 | --- | --- |
-| `/` | Home: the promise, how it works, price and estimator, neighborhoods, FAQ, contact |
+| `/` | Home: the promise, services, how we work, areas, FAQ, contact |
 | `/services/medical-office-cleaning/` and 4 more | Medical, dental, office, gym and studio, post-construction |
 | `/areas/brooklyn/`, `/areas/manhattan/`, `/areas/nassau-county/` | Area pages with their own text and neighborhoods |
-| `/guides/` and 3 guides | Office cleaning cost in NYC, medical office checklist, dental cleaning frequency |
-| `/pricing/`, `/walkthrough/`, `/faq/`, `/about/` | Supporting pages |
+| `/guides/` and 3 guides | What affects cleaning costs in NYC, medical office checklist, dental cleaning frequency |
+| `/walkthrough/`, `/faq/`, `/about/` | Supporting pages |
 | `/one-pager/` | Capability statement for emails and property managers (not indexed) |
 
 Every page has its own title, description, canonical URL and Open Graph tags. Structured data covers LocalBusiness, Service, Article, FAQPage and BreadcrumbList.
