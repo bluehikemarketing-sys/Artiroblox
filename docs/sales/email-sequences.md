@@ -26,12 +26,12 @@ Subject: Re: After-hours cleaning for {practice}
 
 > Hi {first_name}, one more detail in case it's useful: we use color-coded cloths so restroom cloths never touch exam rooms, and we never handle sharps or regulated waste. That stays with your hauler.
 >
-> A 2,000 sq ft practice cleaned three nights a week is about $975 a month with us. Happy to price yours after a 15-minute walkthrough.
+> Happy to price your space after a free 15-minute walkthrough. You get a fixed monthly number in writing within 24 hours.
 
 **Email 3, day 9**
 Subject: Close the loop?
 
-> Hi {first_name}, I'll stop here. If your current cleaning ever falls short, here's a 1-minute price estimate: cleanbymorning.com/pricing/. Reply anytime and I'll come by for a walkthrough.
+> Hi {first_name}, I'll stop here. If your current cleaning ever falls short, there's more about how we work at cleanbymorning.com. Reply anytime and I'll come by for a walkthrough.
 
 ---
 
@@ -56,7 +56,7 @@ Subject: Re: Evening cleaning for {practice}
 **Email 3**
 Subject: Last note
 
-> No worries if the timing's wrong. The price estimator is at cleanbymorning.com/pricing/ whenever it's useful.
+> No worries if the timing's wrong. You can see what we clean and where at cleanbymorning.com whenever it's useful.
 
 ---
 
@@ -76,12 +76,12 @@ Subject: Cleaning for {practice} after you close
 **Email 2**
 Subject: Re: Cleaning for {practice} after you close
 
-> Quick example: a 1,000 sq ft office three nights a week is about $975 a month. Same crew, same checklist, photos after every clean. 15-minute walkthrough this week?
+> Same crew, same checklist, photos after every clean. Could I stop by for a 15-minute walkthrough this week and send you a fixed monthly price?
 
 **Email 3**
 Subject: Closing the loop
 
-> I'll leave it here. If you want a number later, the estimator takes a minute: cleanbymorning.com/pricing/.
+> I'll leave it here. If you want a number later, reply with your square footage and nights a week and I'll send a quote.
 
 ---
 
@@ -101,7 +101,7 @@ Subject: Cleaning vendor for your Brooklyn and Manhattan buildings
 **Email 2**
 Subject: Re: Cleaning vendor
 
-> If you have a move-out or a post-construction clean coming up, I can quote it from photos and the square footage. Post-construction starts at $400, with half up front.
+> If you have a move-out or a post-construction clean coming up, I can quote it from photos and the square footage. We quote after seeing the space, with a deposit to book.
 
 **Email 3**
 Subject: For your vendor file
@@ -115,6 +115,6 @@ Subject: For your vendor file
 | They say | You reply |
 | --- | --- |
 | "We already have someone." | "Makes sense. If anything changes, I can quote in a day. Mind if I check back in three months?" |
-| "How much?" | Ask for square footage and nights; reply with the estimator number the same day and offer a walkthrough to confirm. |
+| "How much?" | Ask for square footage and nights; send a quote from your own rate sheet the same day and offer a walkthrough to confirm. |
 | "Send info." | Send the capability statement link and propose two walkthrough times. |
 | "Not interested." | Thank them and remove them from the list. |

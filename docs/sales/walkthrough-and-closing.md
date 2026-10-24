@@ -6,7 +6,7 @@ The goal of every walkthrough: leave with the information for a fixed monthly pr
 
 - [ ] Look up the practice on Google: square footage, number of providers, hours
 - [ ] Bring a tape measure or laser measure, your phone (photos), and a printed capability statement
-- [ ] Have the estimator open on your phone (cleanbymorning.com/pricing/)
+- [ ] Have your rate sheet handy (the numbers stay with you, they are not on the website)
 
 ## Walkthrough checklist (15 minutes)
 

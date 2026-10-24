@@ -19,7 +19,7 @@ What should come up: your website first, your Google Business Profile panel on t
 
 ## 3. On the website
 
-The site already has a clear offer, prices, an estimator, an FAQ and a capability statement. It's missing the parts only you can add:
+The site already has a clear offer, an FAQ and a capability statement. It's missing the parts only you can add:
 
 - [ ] **A real phone number** you or your voicemail answers (`phone_display` and `phone_e164`). The build prints a warning while it's still the 555 placeholder
 - [ ] **Your name and photo** on the About page (`owner_name`, `owner_photo`, `owner_bio`). For an owner-operated business, a face is the strongest trust signal you have before you have reviews
