@@ -29,7 +29,7 @@ B = {
     "domain": "https://www.cleanbymorning.com",
     "phone_display": "(516) 518-1731",      # the Quo business line
     "phone_e164": "+15165181731",
-    "email": "hello@cleanbymorning.com",    # set up this mailbox on the domain
+    "email": "jamel@cleanbymorning.com",    # the business mailbox
     "city_line": "New York, NY",
     "office_hours": "Quotes Mon–Sat, 9 AM–7 PM",
     "cleaning_hours": "We clean after you close, 6 PM–2 AM",

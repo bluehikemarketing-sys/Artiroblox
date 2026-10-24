@@ -27,6 +27,10 @@ The build writes a `.htaccess` into `site/public` that forces `https://www.`, se
 
 To update later: run `python3 site/build.py`, then upload the changed files (or the whole folder) again.
 
+## Email (Cloudflare)
+
+`jamel@cleanbymorning.com` is set up with Cloudflare Email Routing, which forwards what people send to it into your own inbox (for example Gmail). It does not send. To reply from that address, in Gmail go to Settings → Accounts → "Send mail as" → Add another email address, and use a sending service (Gmail's SMTP with an app password, or a service like Resend or Brevo) so replies come from `@cleanbymorning.com`, not your Gmail. Also add SPF and DKIM records for whatever service sends. Keep cold outreach on separate sending domains, not this one.
+
 ## Deploy (Cloudflare Pages, free)
 
 1. Cloudflare → Workers & Pages → Create → Pages → Connect to Git → this repo.

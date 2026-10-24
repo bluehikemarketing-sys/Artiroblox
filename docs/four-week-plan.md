@@ -5,7 +5,7 @@ Goal: by the end of week 4, the site is live and findable, outreach is running e
 ## Week 1: foundations
 
 - [ ] Buy `cleanbymorning.com`, plus 2 sending domains (`getcleanbymorning.com`, `cleanbymorningnyc.com`)
-- [ ] Set up `hello@cleanbymorning.com` (Google Workspace or similar)
+- [x] Business email `jamel@cleanbymorning.com` is set up (Cloudflare Email Routing: confirm you can send as it from Gmail, see README)
 - [ ] On each sending domain, set up SPF, DKIM and DMARC, then start warming each inbox (10–20 emails a day, rising over 2–3 weeks)
 - [ ] Search "Clean by Morning" in the NY Department of State entity database and the USPTO trademark search
 - [ ] Decide the entity with an accountant: register your Florida LLC in New York, or form a New York LLC (both have a newspaper publication requirement), or start under an assumed name
